@@ -1,0 +1,139 @@
+---
+title: "DEGs"
+output: html_document
+date: "2025-02-18"
+---
+
+# Set up
+```{r}
+rm(list=ls())
+library(ggplot2)
+library(tidyr)
+library(tidyverse)
+library(WGCNA)
+library(pheatmap)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+```
+
+```{r}
+Counts<-read.csv("/Users/alinaklineschoder/Downloads/CT1_Expanded_validation_157_TPM.csv")
+```
+
+# Validation
+```{r}
+Meta_Validation<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_LD_n76_bxoutcome_sampleID.csv")%>%
+  dplyr::select(Subject,Library_Sample_ID,Donor_Vital)%>%
+  rename(Sample_ID=Library_Sample_ID)%>%
+  filter(Donor_Vital=="living")
+
+Counts_Validation<-read.csv("/Users/alinaklineschoder/Downloads/CT1_Stratified_Validation_TPM.csv")%>%
+  rename(Gene=GENE)
+
+colnames(Counts_Validation)<-gsub("\\.","-",colnames(Counts_Validation))
+
+print(length(intersect(Meta_Validation$Sample_ID,colnames(Counts_Validation))))
+
+files<-c("NextSeq2000-VPV3-MissedSamples-Clarava2_clarava_final_gene_matrix.tsv",
+         "NextSeq2000__2023-06-14_VL00035-CT1_Clarava2_clarava_final_gene_matrix.tsv",
+         "NextSeq2000__2023-06-09_VL00033-CT1_21-001_ClaravaOnly_clarava_final_gene_matrix.tsv",
+         "NextSeq2000__2023-03-07_VL00022-CT1-Clarava-2_v2_clarava_final_gene_matrix.tsv",
+         "NextSeq2000__2023-03-20_VL00024-CT1-TNPT3_Clarava2_clarava_final_gene_matrix.tsv",
+         "NextSeq2000__2023-03-21_VL00025-CT1-TNPT3RL_Clarava-only_clarava_final_gene_matrix.tsv",
+         "NextSeq2000__2023-06-06_VL00032-CT1-TNPT7_Clarava2_clarava_final_gene_matrix.tsv",
+         "NextSeq2000__2023-04-05_VL00026-CT1-TNPT4_RQ_ClaravaOnly_clarava_final_gene_matrix.tsv",
+         "NextSeq2000__2023-02-24_VL00021-CT1_Clarava2-Only_clarava_final_gene_matrix.tsv",
+         "NextSeq2000__2023-03-09_VL00023-CT1_Clarava2-v2_clarava_final_gene_matrix.tsv",
+         "NextSeq2000-2022-04-08-VL00012-CT1_RQ-VPV3_Edited_ClaravaONLY_clarava_final_gene_matrix.tsv")
+
+Full<-data.frame()
+for(fi in files){
+  setwd("/Users/alinaklineschoder/Downloads/")
+  tb<-read_tsv(file = fi)
+  if(nrow(Full)==0){
+    Full<-tb
+  }else{
+    Full<-left_join(Full,tb)
+  }
+}
+
+missing<-setdiff(Meta_Validation$Sample_ID,colnames(Counts_Validation))
+colnames(Full)<-gsub("_STAR_Aligned\\.","",colnames(Full))
+new<-c()
+for(miss in missing){
+  found<-colnames(Full)[grepl(miss,colnames(Full))]
+  if(length(found)==1){
+    new<-c(new,found)
+    Meta_Validation$Sample_ID<-gsub(miss,found,Meta_Validation$Sample_ID)
+  }else{
+    print(paste("error with"),miss)
+  }
+}
+
+Counts_Validation<-Counts_Validation%>%
+  rename(GENE=Gene)
+Counts_Validation<-left_join(Full,Counts_Validation)
+
+length(intersect(Meta_Validation$Sample_ID,colnames(Counts_Validation)))
+length(setdiff(Meta_Validation$Sample_ID,colnames(Counts_Validation)))
+
+```
+
+```{r}
+Counts_Train<-read.csv("/Users/alinaklineschoder/Downloads/CT1_Stratified_Training_TPM(in).csv")
+
+Meta_Train<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_May_123Train_AllInclusive_Annotations_WithBinaryReject.csv")%>%
+  dplyr::select(Subject,Sample_ID,groups)%>%
+  rename(Donor_Vital=groups)
+
+colnames(Counts_Train)<-gsub("\\.","-",colnames(Counts_Train))
+
+length(intersect(Meta_Train$Sample_ID,colnames(Counts_Train)))
+length(setdiff(Meta_Train$Sample_ID,colnames(Counts_Train)))
+```
+
+## Merging it all together
+```{r}
+Samples<-bind_rows(Meta_Train,Meta_Validation)%>%
+  filter(Donor_Vital=="living")%>%
+  pull(Sample_ID)%>%
+  unique()
+
+Counts_Validation<-Counts_Validation%>%
+  rename(Gene=GENE)
+
+Counts_Full<-left_join(Counts_Train,Counts_Validation)%>%
+  column_to_rownames(var="Gene")
+length(Samples)
+dim(Counts_Full[,Samples])
+Counts_Full<-Counts_Full[,Samples]
+```
+
+#Load biomart
+```{r}
+library(biomaRt)
+
+ensembl = biomaRt::useMart("ensembl",dataset="hsapiens_gene_ensembl")
+```
+
+### swap gene id for gene symbol in counts val. for gene symbol dups, add expression ###
+```{r}
+dim(Counts_Full)
+ens <- rownames(Counts_Full)
+mart <- useDataset("hsapiens_gene_ensembl", mart = useMart("ensembl"))
+Counts_Full$ensembl_id <- rownames(Counts_Full)
+g_list <- getBM(attributes = c("ensembl_gene_id", "hgnc_symbol"), values = ens, mart = mart, filters = "ensembl_gene_id")
+
+Counts_Full <- left_join(Counts_Full, g_list, by = c("ensembl_id" = "ensembl_gene_id"))
+Counts_Full$ensembl_id <- NULL
+Counts_Full <- Counts_Full %>% dplyr::select(hgnc_symbol, everything())
+Counts_Full <- aggregate(. ~ hgnc_symbol, data=Counts_Full, FUN=sum)
+Counts_Full <- Counts_Full[which(Counts_Full$hgnc_symbol != ""),]
+Counts_Full <- Counts_Full[which(!is.na(Counts_Full$hgnc_symbol)),]
+dim(Counts_Full)
+```
+
+```{r}
+write.table(Counts_Full, "/Users/alinaklineschoder/Desktop/LivingDonor_iSort_Prep.txt", sep = "\t", row.names = F, quote = F)
+```
+

@@ -1,0 +1,189 @@
+---
+title: "PlotsForPoster"
+output: html_document
+date: "2025-02-18"
+---
+
+# Set up
+```{r}
+rm(list=ls())
+library(ggplot2)
+library(tidyr)
+library(tidyverse)
+library(WGCNA)
+library(pheatmap)
+library(clusterProfiler)
+library(org.Hs.eg.db)  # Change if using mouse (org.Mm.eg.db)
+```
+
+# Loading in and filtering current TPM
+```{r}
+# testing other annotation files
+df1<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_deceased_donor_Training_Annotations_AllInclusive_WithBinaryReject(in).csv")
+
+df2<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_May_123Train_AllInclusive_Annotations_WithBinaryReject(in).csv")
+
+df<-bind_rows(df1,df2)%>%
+  dplyr::select(-c(X,X.1))%>%
+  distinct()%>%
+  dplyr::select(Subject,Sample_ID)%>%
+  rename(Sample_ID_Other=Sample_ID)
+
+Data<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_validation_122samples_annotations_pred_longterm_outcomes_ryan_reject.csv")%>%
+  mutate(Sample_ID=Sequencing_Sample_ID)
+Data2<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_deceased_donor_training_5_Annotations_Allinclusive_ar_WithBinaryReject_ar_ryan_reject.csv")
+
+Data_isort<-bind_rows(Data,Data2)%>%
+  dplyr::select(Subject,Sample_ID)%>%
+  rename(Sample_ID_Ryan=Sample_ID)
+
+FullMeta<-full_join(Data_isort,df)
+
+
+TPM1<-read.csv("/Users/alinaklineschoder/Downloads/CT1_Stratified_Training_TPM(in).csv")
+
+TPM2<-read.csv("/Users/alinaklineschoder/Downloads/CT1_Stratified_Validation_TPM(in).csv")
+
+FullTPM <- full_join(TPM1, TPM2, by = c("Gene" = "GENE"))%>%
+  column_to_rownames(var="Gene")
+rownames(df)<-gsub("-","\\.",rownames(df))
+FilteredTPM<-FullTPM[,rownames(df)]
+```
+
+
+
+# Pre-process TPM
+```{r}
+tpm_data <- t(FilteredTPM)
+tpm_data <- tpm_data[,apply(tpm_data, 2, var) > 0.1]
+log_tpm_data <- log2(tpm_data + 1)
+gsg = goodSamplesGenes(log_tpm_data, verbose = 3)
+log_tpm_data <- log_tpm_data[gsg$goodSamples,gsg$goodGenes]
+```
+
+# detect sample outliers
+```{r}
+# Transpose for clustering
+sample_tree <- hclust(dist((log_tpm_data)), method = "average")
+
+# Plot sample clustering
+par(mfrow = c(1,1))
+plot(sample_tree, main = "Sample Clustering to Detect Outliers", sub = "", xlab = "", cex = 0.5)
+
+```
+
+```{r}
+# Choose power for network construction
+powers = c(1:20)
+sft = pickSoftThreshold(log_tpm_data, powerVector = powers, verbose = 5)
+
+# Plot Scale-Free Topology Fit
+par(mfrow = c(1,2))
+plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3]) * sft$fitIndices[,2],
+     xlab = "Soft Threshold (power)", ylab = "Scale-Free Topology Fit", type = "o",
+     main = "Scale Independence")
+abline(h = 0.9, col = "red")  # Choose power where R² > 0.9
+
+plot(sft$fitIndices[,1], sft$fitIndices[,5], type = "o",
+     xlab = "Soft Threshold (power)", ylab = "Mean Connectivity",
+     main = "Mean Connectivity")
+```
+
+```{r}
+# Use selected soft-threshold power (e.g., 6)
+softPower = 7  
+
+adjacency = adjacency(log_tpm_data, power = softPower)
+
+# Convert to Topological Overlap Matrix (TOM)
+TOM = TOMsimilarity(adjacency)
+dissTOM = 1 - TOM
+
+# Hierarchical clustering
+gene_tree = hclust(as.dist(dissTOM), method = "average")
+
+# Plot Gene Clustering Tree
+plot(gene_tree, main = "Clustering of Genes", xlab = "", sub = "")
+```
+
+```{r}
+# Dynamic Tree Cut for module detection
+dynamicMods = cutreeDynamic(dendro = gene_tree, distM = dissTOM,
+                            deepSplit = 2, pamRespectsDendro = FALSE,
+                            minClusterSize = 30)
+
+# Convert numeric labels into colors
+dynamicColors = labels2colors(dynamicMods)
+
+# Plot module dendrogram
+plotDendroAndColors(gene_tree, dynamicColors, "Dynamic Tree Cut",
+                    main = "Gene Module Identification", dendroLabels = FALSE)
+```
+
+```{r}
+ME_list = moduleEigengenes(log_tpm_data, colors = dynamicColors)
+MEs = ME_list$eigengenes
+
+# Cluster module eigengenes
+METree = hclust(dist(MEs), method = "average")
+
+# Plot the clustering of module eigengenes
+plot(METree, main = "Clustering of Module Eigengenes", xlab = "", sub = "")
+
+```
+
+# comparing with iSort - granular
+```{r}
+
+broad_cells_of_interest<-c("Neutrophils","Monocytes","Dendritic_cells_activated","T_cells_gamma_delta")
+
+isort_results_val <- read.table("/Users/alinaklineschoder/Downloads/iSort_job63-121324-160003_Relative_AdjustedB.txt",header = T)%>%
+  mutate(Subject=Mixture)%>%
+  dplyr::select(-c(Mixture,P.value,Correlation,RMSE))%>%
+  column_to_rownames(var="Subject")
+colnames(isort_results_val) <- gsub("\\.","_",colnames(isort_results_val))
+rownames(isort_results_val)<-gsub("-","\\.",rownames(isort_results_val))
+isort_results_val<-isort_results_val[,broad_cells_of_interest]
+# Ensure sample names match between datasets
+common_samples <- intersect(rownames(MEs), rownames(isort_results_val))
+MEs <- MEs[common_samples,]
+isort_results_val <- isort_results_val[common_samples,]
+
+# Correlate module eigengenes with immune cell fractions
+module_trait_cor = cor(MEs, isort_results_val, use = "p")
+module_trait_pval = corPvalueStudent(module_trait_cor, nSamples = nrow(MEs))
+
+# Heatmap of module-trait relationships
+pheatmap(module_trait_cor, display_numbers = TRUE, cluster_rows = TRUE, cluster_cols = TRUE)
+
+
+```
+
+# comparing with rejection vs non 
+```{r}
+df$MM_Rejection_Determination <- as.factor(df$MM_Rejection_Determination)
+common_samples <- intersect(rownames(log_tpm_data), rownames(df))
+
+log_tpm_data <- log_tpm_data[common_samples, ]
+df <- df[common_samples, ]
+
+# Calculate Module Eigengenes
+MEs = moduleEigengenes(log_tpm_data, colors = dynamicColors)$eigengenes
+
+# Compute correlation between modules and rejection status
+module_trait_cor = cor(MEs, as.numeric(df$MM_Rejection_Determination), use = "p")
+
+# Compute significance (p-values)
+module_trait_pval = corPvalueStudent(module_trait_cor, nSamples = nrow(df))
+
+# Display module-trait associations
+module_trait_df <- data.frame(Module = rownames(module_trait_cor),
+                              Correlation = module_trait_cor,
+                              P.value = module_trait_pval)
+
+# Filter significantly associated modules (e.g., p < 0.05)
+significant_modules <- module_trait_df[module_trait_df$P.value < 0.05, ]
+
+print(significant_modules)
+```
+

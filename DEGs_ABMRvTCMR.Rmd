@@ -1,0 +1,173 @@
+---
+title: "DEGs"
+output: html_document
+date: "2025-02-18"
+---
+
+# Set up
+```{r}
+rm(list=ls())
+library(ggplot2)
+library(tidyr)
+library(tidyverse)
+library(WGCNA)
+library(pheatmap)
+library(clusterProfiler)
+library(org.Hs.eg.db)  # Change if using mouse (org.Mm.eg.db)
+```
+
+# Loading in raw counts and metadata
+```{r}
+Data<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_validation_122samples_annotations_pred_longterm_outcomes_ryan_reject.csv")%>%
+  mutate(Subject=Sequencing_Sample_ID,reject=ryan_reject)%>%
+  dplyr::select(reject,Subject,MM_Rejection_Type,Subject)
+
+Data2<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_deceased_donor_training_5_Annotations_Allinclusive_ar_WithBinaryReject_ar_ryan_reject.csv")%>%
+  mutate(Subject=Sample_ID,reject=ryan_reject)%>%
+  dplyr::select(reject,Subject,MM_Rejection_Type)
+Data<-bind_rows(Data,Data2)
+
+typs<-unique(Data$MM_Rejection_Type)
+ABMR<-typs[grepl("ABMR",typs)]
+MildModerateTCMR<-c("borderline","IA")
+SevereTCMR<-setdiff(typs,c(ABMR,MildModerateTCMR,""))
+
+
+Data$Group<-"tbd"
+Data[Data$MM_Rejection_Type%in%ABMR,"Group"]<-"ABMR"
+Data[Data$MM_Rejection_Type%in%MildModerateTCMR,"Group"]<-"MildModerateTCMR"
+Data[Data$MM_Rejection_Type%in%SevereTCMR,"Group"]<-"SevereTCMR"
+Data[Data$MM_Rejection_Type=="","Group"]<-"NoReject"
+
+Data$Group2<-"tbd"
+Data[Data$MM_Rejection_Type%in%ABMR,"Group2"]<-"ABMR"
+Data[Data$MM_Rejection_Type%in%c(MildModerateTCMR,SevereTCMR),"Group2"]<-"TCMR"
+Data[Data$MM_Rejection_Type=="","Group2"]<-"NoReject"
+
+Meta<-Data%>%
+  column_to_rownames(var="Subject")%>%
+  filter(Group2!="tbd")%>%
+  filter(reject=="Reject")
+```
+
+```{r}
+Counts1<-read.csv("/Users/alinaklineschoder/Downloads/CT1_Stratified_Validation_TPM_122samples(in).csv")
+Counts2<-read.csv("/Users/alinaklineschoder/Downloads/CT1_Stratified_Training_deceased_donor_TPM_11K(in).csv")
+
+Data<-full_join(Counts1,Counts2)%>%
+  column_to_rownames(var="X")
+
+colnames(Data)<-gsub("\\.","-",colnames(Data))
+
+Data<-na.omit(Data)
+```
+
+# DEGs in subgroups
+```{r}
+library(edgeR)
+form <- as.formula(~0+Group2)
+con<-c("Group2ABMR - Group2TCMR")
+
+both<-intersect(rownames(Meta),colnames(Data))
+
+design <- model.matrix(form, data = Meta[both,]) 
+y <- DGEList(counts = as.matrix(Data[,both]))
+y <- calcNormFactors(y)
+v <- voom(y, design)
+fit <- lmFit(v, design)
+contrast_matrix <- makeContrasts(contrasts = con, levels = design)
+fit <- contrasts.fit(fit, contrast_matrix)
+fit <- eBayes(fit)
+contrast_names <- colnames(contrast_matrix)  # Extract contrast names
+results_list<-list()
+for (i in seq_along(contrast_names)) {
+                res <- topTable(fit, coef = contrast_names[i], number = Inf, sort.by = "P")
+                res <- as.data.frame(res)
+                res$Gene <- rownames(res)
+                res$Contrast <- contrast_names[i]  # Add contrast name
+                rownames(res) <- NULL
+                results_list[[i]] <- res
+}
+results_df <- do.call(rbind, results_list)
+
+```
+
+
+```{r}
+ggplot(results_df,aes(x=logFC,y=(-log10(P.Value))))+
+  geom_point()+
+  facet_grid(~Contrast)+
+  geom_hline(yintercept = -log10(0.05))+
+  theme_bw()
+```
+
+# gsea
+```{r}
+library(clusterProfiler)
+library(org.Hs.eg.db) 
+library(DOSE)
+
+
+# Create a ranked gene list based on logFC
+gene_list <- results_df$logFC  # Use logFC for ranking
+names(gene_list) <- results_df$Gene # Assign Ensembl IDs as names
+
+# Remove NA values and sort in decreasing order
+gene_list <- na.omit(gene_list)
+gene_list <- sort(gene_list, decreasing = TRUE)  # GSEA expects ranked input
+
+# Perform GSEA-based GO enrichment using Ensembl IDs
+gsea_results <- gseGO(geneList = gene_list, 
+                      OrgDb = org.Hs.eg.db, 
+                      keyType = "ENSEMBL",  # Use Ensembl IDs directly
+                      ont = "BP",  # "BP" = Biological Process, "MF" = Molecular Function, "CC" = Cellular Component
+                      pvalueCutoff = 1,
+                      verbose = TRUE)
+
+# View top GO terms
+head(gsea_results)
+
+# Plot results
+gseaplot(gsea_results, geneSetID = 1, title = gsea_results@result$Description[1])
+ridgeplot(gsea_results, showCategory = 10)  # Ridge plot visualization
+dotplot(gsea_results, showCategory = 20)  # Dot plot visualization
+
+```
+```{r}
+# Load required libraries
+library(clusterProfiler)
+library(ggplot2)
+library(dplyr)
+
+# Convert GSEA results into a dataframe
+5
+# Select top 10 enriched GO terms (modify as needed)
+top_terms <- gsea_df %>%
+  arrange(p.adjust) %>%
+  head(20)
+
+
+
+keep<-c("positive regulation of neutrophil migration","natural killer cell mediated immunity","monocyte chemotaxis","negative regulation of B cell mediated immunity","blood vessel development","response to growth factor","leukocyte mediated cytotoxicity","chemokine-mediated signaling pathway","mucosal immune response","glucose homeostasis","antimicrobial humoral response","leukocyte mediated cytotoxicity")
+
+
+# Create the dot plot using ggplot2
+ggplot(gsea_df%>%filter(Description%in%keep), aes(x = reorder(Description, NES), y = NES, size = setSize, color = p.adjust)) +
+  geom_point(alpha = 0.8) +
+  coord_flip() +  # Flip for better readability
+  scale_color_gradient(low = "red", high = "blue") +  # Color based on p.adjust
+  labs(title = "GSEA Enrichment Dot Plot",
+       x = "GO Term",
+       y = "Normalized Enrichment Score (NES)",
+       color = "Adjusted P-Value",
+       size = "Gene Count") +
+  theme_minimal()
+
+gsea_df$lab<-""
+gsea_df[gsea_df$Description%in%keep,"lab"]<-gsea_df[gsea_df$Description%in%keep,"Description"]
+ggplot(gsea_df, aes(x = NES, y = -log10(p.adjust))) +
+  geom_point(aes(size = setSize),alpha = 0.5) +
+  ggrepel::geom_text_repel(aes(label=Description))+
+  theme_minimal()
+```
+
