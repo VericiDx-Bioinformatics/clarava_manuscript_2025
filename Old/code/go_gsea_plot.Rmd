@@ -1,0 +1,252 @@
+---
+title: 'Clarava Visualizations: GSEA'
+author: "VericiDx Bioinformatics"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+---
+title: "Clarava Visualizations: DeSeq2 Differential Gene Expression"
+author: "VericiDx Bioinformatics"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+knitr::opts_chunk$set(cache= TRUE)
+```
+
+This R Notebook calculates differential expressed genes (DEG) using DESeq2 and generates volcano plot for Clarava Manuscript.
+
+# Install and load required packages
+
+```{r}
+library(tidyverse)
+library(DESeq2)
+library(biomaRt)
+library(yaml)
+library(pheatmap)
+library(Glimma)
+library(highcharter)
+library(EnhancedVolcano)
+library(clusterProfiler)
+```
+
+# Define Paths
+Read config file and define file paths for inputs. The inputs includes the gene counts, annotation and gene lists. Finally, we read the inputs.
+```{r define paths}
+# prepare config file and directories
+config_path <- "../config.yml"
+
+config <- read_yaml(config_path)
+
+#Base directory
+base_dir <- dirname(normalizePath(config_path))
+
+#Constants directory - this contains subdirectories including the gene lists and counts
+data_dir <- file.path(base_dir, config$data_dir)
+
+#Other directories with constant files
+gene_lists_dir <- file.path(paste(data_dir, config$gene_lists_dir, sep = ""))
+counts_dir <- file.path(paste(data_dir, config$counts_dir, sep = ""))
+annotations_dir <- file.path(paste(data_dir, config$annotations_dir, sep = ""))
+results_dir <- file.path(paste0(base_dir, "/",config$results_dir))
+
+#Annotations for the training samples
+annotation_data_path <- file.path(paste(annotations_dir, config$ct1_annotations_123samples, sep = ""))
+
+# Raw gene data after the raw filter
+# Following count filtering 11170 genes remained for analysis
+raw_gene_data_post_rawfilter_path <- file.path(paste(counts_dir, config$gene_data_raw_counts, sep = ""))
+
+# Gene Signature Path
+gene_sig_29_path <- file.path(paste0(gene_lists_dir, config$gene_sig_29))
+genes_581_path <- file.path(paste0(gene_lists_dir, config$dge_genes_581))
+
+# Define the output path
+res_out_path <- file.path(paste(results_dir, config$deseq2_results_firstRawFilter, sep = ""))
+```
+
+# Read data
+```{r read data}
+annotation_data <- read.csv(annotation_data_path, row.names = 1)
+rownames(annotation_data) <- annotation_data$Sample_ID
+
+
+gene_data_raw <- read.csv(raw_gene_data_post_rawfilter_path, check.names = F, row.names = 1)
+
+# DGE genes - 581 genes
+genes_581 <- read.csv(genes_581_path)
+
+# 29 gene signature
+gene_sig_29 <- read.csv(gene_sig_29_path)
+```
+
+
+```{r}
+#Convert to matrix and integer format
+gene_matrix <- as.matrix(gene_data_raw)
+mode(gene_matrix) <- "integer"
+```
+
+We limit samples to the ones in the annotation file.
+There are total 123 samples and 11170 genes.
+```{r}
+gene_matrix <- gene_matrix[,annotation_data$Sample_ID]
+dim(gene_matrix)
+
+
+# Check for NA values in the matrix
+any(is.na(gene_matrix))
+```
+
+Check if annotation and gene data are in the same order
+```{r}
+all(rownames(annotation_data) == colnames(gene_matrix))
+```
+
+
+```{r}
+# Convert the rejection annotations to a factor
+annotation_data$MM_Rejection_Determination <- as.factor(annotation_data$MM_Rejection_Determination)
+
+# Print a table of the rejection statuses
+table(annotation_data$MM_Rejection_Determination) # Checks out
+```
+
+# DESeq2 Analysis
+Create a DESeqDataSet object from the count and annotation data.
+
+```{r}
+ddsMat <- DESeqDataSetFromMatrix(countData=gene_matrix, colData=annotation_data, design= ~ MM_Rejection_Determination)
+```
+
+We now perform differential expression analysis based on the negative binomial (A.K.A. Gamma-Poisson) distribution. This is done through estimation of size factors (using the "median ratio method"), estimation of dispersion and testing for significance of coefficients in a Negative Binomial GLM, using previously calculated sizeFactors (or normalizationFactors) and dispersion estimates.
+
+Perform differential expression analysis.
+```{r}
+dds <- DESeq(ddsMat)
+```
+
+## Extract the results
+```{r}
+result <- results(dds, c("MM_Rejection_Determination", "Reject", "NoReject"))
+summary(result)
+
+results(dds)
+```
+
+We check how many genes are considered significant.
+
+```{r}
+## Extract a dataframe of the DeSeq2 results for all samples
+result_object <- na.omit(result)
+filtered_result <- data.frame(result_object@listData)
+rownames(filtered_result) <- result_object@rownames
+filtered_result[,"GeneID"] <- rownames(filtered_result)
+```
+
+Check how many values pass certain thresholds (user testing)
+```{r}
+# Almac cutoffs 
+# a relatively high p-value cut-off of 0.01 and no fold change threshold to ensure any gene that may contribute even a small amount to discriminatory power was included.
+sum(filtered_result$pvalue < 0.01) # 344
+sum(filtered_result$pvalue < 0.01 & (abs(filtered_result$log2FoldChange) >= 1)) # 5
+```
+
+```{r}
+# Add gene symbol to filtered_result
+ens <- filtered_result$GeneID
+mart <- useDataset("hsapiens_gene_ensembl", mart = useMart("ensembl"))
+g_list <- getBM(attributes = c("ensembl_gene_id", "hgnc_symbol"), values = ens, mart = mart, filters = "ensembl_gene_id")
+
+filtered_result <- left_join(filtered_result, g_list, by = c("GeneID" = "ensembl_gene_id"))
+```
+
+
+# GoTerm plots
+### 581 gene signature
+Here we perform GSEA analysis for 581 DEGs. This is visualized using a dotplot and heatmap.
+```{r}
+# Prepare input
+geneList <- filtered_result %>% 
+  select(GeneID, log2FoldChange) %>% 
+  dplyr::arrange(-log2FoldChange) %>% 
+  filter(GeneID %in% genes_581$Gene)
+
+
+geneList <- deframe(geneList)
+
+# GSEA Analysis
+ggo <- gseGO(gene = geneList,
+              OrgDb = org.Hs.eg.db,
+              keyType = "ENSEMBL",
+              ont = "ALL",
+              pvalueCutoff = 1,
+              verbose      = FALSE)
+dotplot(ggo, showCategory=20,color = "pvalue")
+
+# Heatmap
+# Skip this heatmap since it is not readable
+ggo_symbol <- setReadable(ggo, 'org.Hs.eg.db', 'ENSEMBL')
+p1 <- heatplot(ggo_symbol, foldChange=geneList, showCategory=10)
+p1
+```
+
+```{r}
+# save dotplot
+go_581_path <- file.path(paste0(results_dir, "gsea_dotplot_581_genes.pdf"))
+
+pdf(go_581_path, width = 8,height = 7)
+dotplot(ggo, showCategory=20,color = "pvalue")
+dev.off()
+```
+
+
+# GoTerm plots
+### 29 gene signature
+Here we perform GSEA analysis for 29 Clarava genes. This is visualized using a dotplot and heatmap.
+```{r}
+# Prepare input
+geneList <- filtered_result %>% 
+  select(GeneID, log2FoldChange) %>% 
+  dplyr::arrange(-log2FoldChange) %>% 
+  filter(GeneID %in% gene_sig_29$Ensembl_ID)
+
+
+geneList <- deframe(geneList)
+
+# GSEA Analysis
+ggo <- gseGO(gene = geneList,
+              OrgDb = org.Hs.eg.db,
+              keyType = "ENSEMBL",
+              ont = "ALL",
+              pvalueCutoff = 0.5,
+              verbose      = FALSE)
+dotplot(ggo, showCategory=20,color = "pvalue")
+
+
+# Heatmap
+ggo_symbol <- setReadable(ggo, 'org.Hs.eg.db', 'ENSEMBL')
+p1 <- heatplot(ggo_symbol, foldChange=geneList, showCategory=10)
+p1
+```
+
+```{r}
+# save dotplot
+go_29_path <- file.path(paste0(results_dir, "gsea_dotplot_29_genes.pdf"))
+
+pdf(go_29_path, width = 8,height = 7)
+dotplot(ggo, showCategory=20,color = "pvalue")
+dev.off()
+
+
+# save heatplot
+go_29_heatmap_path <- file.path(paste0(results_dir, "gsea_heatplot_29_genes.pdf"))
+
+pdf(go_29_path, width = 6,height = 3.5)
+p1
+dev.off()
+
+```
