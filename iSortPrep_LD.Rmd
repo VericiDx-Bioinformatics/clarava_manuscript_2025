@@ -27,7 +27,7 @@ Meta_Validation<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_LD_n76_bxo
   rename(Sample_ID=Library_Sample_ID)%>%
   filter(Donor_Vital=="living")
 
-Counts_Validation<-read.csv("/Users/alinaklineschoder/Downloads/CT1_Stratified_Validation_TPM.csv")%>%
+Counts_Validation<-read.csv("/Users/alinaklineschoder/Downloads/CT1_Expanded_validation_157_TPM.csv")%>%
   rename(Gene=GENE)
 
 colnames(Counts_Validation)<-gsub("\\.","-",colnames(Counts_Validation))
@@ -82,6 +82,11 @@ length(setdiff(Meta_Validation$Sample_ID,colnames(Counts_Validation)))
 ```{r}
 Counts_Train<-read.csv("/Users/alinaklineschoder/Downloads/CT1_Stratified_Training_TPM(in).csv")
 
+Meta_Validation<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_LD_n76_bxoutcome_sampleID.csv")%>%
+  dplyr::select(Subject,Library_Sample_ID,Donor_Vital)%>%
+  rename(Sample_ID=Library_Sample_ID)%>%
+  filter(Donor_Vital=="living")
+
 Meta_Train<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_May_123Train_AllInclusive_Annotations_WithBinaryReject.csv")%>%
   dplyr::select(Subject,Sample_ID,groups)%>%
   rename(Donor_Vital=groups)
@@ -94,6 +99,15 @@ length(setdiff(Meta_Train$Sample_ID,colnames(Counts_Train)))
 
 ## Merging it all together
 ```{r}
+Meta_Validation<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_LD_n76_bxoutcome_sampleID.csv")%>%
+  dplyr::select(Subject,Library_Sample_ID,Donor_Vital)%>%
+  rename(Sample_ID=Library_Sample_ID)%>%
+  filter(Donor_Vital=="living")
+
+Meta_Train<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_May_123Train_AllInclusive_Annotations_WithBinaryReject.csv")%>%
+  dplyr::select(Subject,Sample_ID,groups)%>%
+  rename(Donor_Vital=groups)
+
 Samples<-bind_rows(Meta_Train,Meta_Validation)%>%
   filter(Donor_Vital=="living")%>%
   pull(Sample_ID)%>%

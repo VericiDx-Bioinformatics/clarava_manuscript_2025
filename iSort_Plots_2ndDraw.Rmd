@@ -1,0 +1,202 @@
+---
+title: "PlotsForPoster"
+output: html_document
+date: "2025-02-18"
+---
+
+# Set up
+```{r}
+rm(list=ls())
+library(pROC)
+library(ggplot2)
+library(tidyr)
+library(tidyverse)
+```
+
+## Loading in files
+```{r}
+Meta<-read.csv("/Users/alinaklineschoder/Desktop/Data/Clarava_Meta.csv")
+AlliSort<-read.csv("/Users/alinaklineschoder/Desktop/Data/Clarava_iSort.csv")
+
+Pats<-Meta%>%
+  filter(Draw==2)%>%
+  pull(Subject)
+
+Meta<-Meta%>%
+  filter(Subject%in%Pats)%>%
+  dplyr::select(Sample_ID,Subject,Draw,MM_Rejection_Type)
+
+AlliSort<-AlliSort%>%
+  filter(Sample_ID%in%Meta$Sample_ID)%>%
+  dplyr::select(-c(X))
+```
+
+```{r}
+Long <- Meta %>%
+  left_join(AlliSort) %>%
+  pivot_longer(cols=setdiff(colnames(.), c("Subject", "Draw","MM_Rejection_Type","Sample_ID"))) %>%
+  group_by(name) %>%
+  mutate(value = (value - min(value, na.rm = TRUE)) / (max(value, na.rm = TRUE) - min(value, na.rm = TRUE)))
+```
+
+
+# Granular Plots
+```{r}
+Long$Broad<-"Other"
+Long$Broad[Long$name%in%c("B_cells_naive","B_cells_memory")]<-"B Cells"
+Long$Broad[Long$name%in%c("T_cells_CD4_memory_activated","T_cells_CD4_memory_resting","T_cells_CD4_naive","T_cells_follicular_helper","T_cells_regulatory__Tregs_","T_cells_gamma_delta","T_cells_CD8")]<-"T-Cells"
+
+Long$Broad[Long$name%in%c("NK_cells_resting","NK_cells_activated")]<-"NK Cells"
+Long$Broad[Long$name%in%c("Dendritic_cells_resting","Dendritic_cells_activated")]<-"Dendritic Cells"
+Long$Broad[Long$name%in%c("Mast_cells_resting","Mast_cells_activated")]<-"Mast Cells"
+Long$Broad[Long$name%in%c("Macrophages_M0","Macrophages_M1","Macrophages_M2","Monocytes")]<-"Macrophages/\nMonocytes"
+
+Long$name <- sapply(Long$name, function(d) {
+    categorized <- case_when(
+      d == "B_cells_naive" ~ "Naive B-Cells",
+      d == "B_cells_memory" ~ "Memory B-Cells",
+      d == "Plasma_cells" ~ "Plasma Cells",
+      d == "T_cells_CD8" ~ "CD8 T-Cells",
+      d == "T_cells_CD4_naive" ~ "Naive CD4 T-Cells",
+      d == "T_cells_CD4_memory_resting" ~ "CD4 Resting Memory T-Cells",
+      d == "T_cells_CD4_memory_activated" ~ "CD4 Activated Memory T-Cells",
+      d == "T_cells_follicular_helper" ~ "Follicular Helper T-Cells",
+      d == "T_cells_regulatory__Tregs_" ~ "Regulatory T-Cells",
+      d == "T_cells_gamma_delta" ~ "Gamma-Delta T-Cells",
+      d == "NK_cells_resting" ~ "Resting NK Cells",
+      d == "NK_cells_activated" ~ "Activated NK Cells",
+      d == "Macrophages_M0" ~ "M0 Macrophages",
+      d == "Macrophages_M1" ~ "M1 Macrophages",
+      d == "Macrophages_M2" ~ "M2 Macrophages",
+      d == "Dendritic_cells_resting" ~ "Resting Dendritic Cells",
+      d == "Dendritic_cells_activated" ~ "Activated Dendritic Cells",
+      d == "Mast_cells_resting" ~ "Resting Mast Cells",
+      d == "Mast_cells_activated" ~ "Activated Mast Cells",
+      d == "Monocytes" ~ "Monocytes",
+      d == "Eosinophils" ~ "Eosinophils",
+      d == "Neutrophils" ~ "Neutrophils",
+    )
+})
+
+# Reorder 'name' by median value
+Order <- Long %>%
+  group_by(name)%>%
+  summarize(med=mean(value))%>%
+  arrange(med)%>%
+  pull(name)
+
+Long$name<-factor(Long$name,levels=Order)
+
+for(group in Long$name%>%unique()){
+  ggp<-ggplot(Long%>%filter(name==group), aes(x = as.factor(Draw), y = value)) +
+    geom_boxplot(outlier.shape = NA) +
+    geom_point(size = 0.05, alpha = 0.5)+
+    geom_line(aes(group=Subject),size=0.5,alpha=0.5) + 
+    ggpubr::stat_compare_means(method = "t.test", label = "p.format", 
+                               hide.ns = FALSE, size = 3, hjust = 0.5, vjust = 0.5,paired=T) +
+    theme_bw() +
+    theme(strip.background = element_rect(fill = "white"),
+          strip.text.y.right = element_text(angle = 0),
+          panel.grid = element_blank()) +
+    labs(y = "Composition (Min/Max Normalized)") +
+    theme(axis.title.y = element_blank())+ggtitle(group)
+  print(ggp)
+}
+
+```
+
+# Paired t test and mean percent change for every cell type
+```{r}
+Setup<-Long%>%
+  dplyr::select(-c(Sample_ID,MM_Rejection_Type))%>%
+  pivot_wider(names_from = Draw,values_from = value)
+
+FullDF<-data.frame()
+for(cell in unique(setdiff(unique(Setup$name),"Activated Mast Cells"))){
+  filt<-Setup%>%
+    filter(name==cell)
+  P<-t.test(filt$`1`, filt$`2`, paired = TRUE)
+  P<-P$p.value
+  Dif<-(filt$`2`-filt$`1`)
+  Dif<-mean(Dif[Dif!=Inf],na.rm=T)
+  DF<-data.frame(cell=cell,Broad=unique(filt$Broad),PVal=P,PerDif=Dif)
+  FullDF<-bind_rows(DF,FullDF)
+}
+
+FullDF$PerDif<-gsub("NaN","100",FullDF$PerDif)
+FullDF$PerDif<-as.numeric(FullDF$PerDif)
+ggplot(FullDF,aes(y=reorder(cell,PerDif),x=PerDif,shape=PVal<0.05))+facet_grid(Broad~.,scales="free",space="free")+geom_point()+theme(strip.text.y = element_text(angle=0))+theme_bw()+theme(strip.text.y = element_text(angle=0),strip.background = element_blank())+geom_vline(xintercept = 0)+scale_shape_manual(values=c(1,8))+xlab("Mean Difference (Draw 2 vs Draw 1)")+ylab("")
+
+ggplot(FullDF,aes(x=PerDif,y=-log10(PVal)))+geom_point()+theme_bw()+theme(strip.text.y = element_text(angle=0))
+
+for(group in Long$name%>%unique()){
+  ggp<-ggplot(Long%>%filter(name==group), aes(x = as.factor(Draw), y = value)) +
+    geom_boxplot(outlier.shape = NA) +
+    geom_point(size = 0.05, alpha = 0.5)+facet_wrap(.~name) +
+    geom_line(aes(group=Subject),size=0.5,alpha=0.5) + 
+    ggpubr::stat_compare_means(method = "t.test", label = "p.format", 
+                               hide.ns = FALSE, size = 3, hjust = 0.5, vjust = 0.5,paired=T) +
+    theme_bw() +
+    theme(strip.background = element_rect(fill = "white"),
+          strip.text.y.right = element_text(angle = 0),
+          panel.grid = element_blank()) +
+    labs(y = "Composition (Min/Max Normalized)") +
+    theme(axis.title.y = element_blank())+ggtitle(group)
+  print(ggp)
+}
+```
+
+# Merged Cell Types
+```{r}
+Long <- Meta %>%
+  left_join(AlliSort) %>%
+  mutate(`B-Cells` = B_cells_naive + B_cells_memory,
+         `CD4 T-Cells` = T_cells_CD4_memory_activated + T_cells_CD4_memory_resting +T_cells_CD4_naive + T_cells_follicular_helper + T_cells_regulatory__Tregs_,
+         `CD8 T-Cells` = T_cells_CD8,
+         `NK Cells` = NK_cells_resting + NK_cells_activated,
+         `Dendritic Cells` = Dendritic_cells_resting + Dendritic_cells_activated,
+         `Mast Cells` = Mast_cells_resting + Mast_cells_activated,
+         `Macrophages` = Macrophages_M0+Macrophages_M1+Macrophages_M2,
+         `Plasma Cells` = Plasma_cells)%>%
+  pivot_longer(cols=c(Eosinophils, `B-Cells`, `NK Cells`, `Dendritic Cells`, `Mast Cells`, Macrophages, `Plasma Cells`, Monocytes, `CD4 T-Cells`,`CD8 T-Cells`, Neutrophils))%>%
+  group_by(name) %>%
+  mutate(value = (value - min(value, na.rm = TRUE)) / (max(value, na.rm = TRUE) - min(value, na.rm = TRUE)))
+
+# Reorder 'name' by median value
+Order <- Long %>%
+  group_by(name)%>%
+  summarize(med=mean(value))%>%
+  arrange(med)%>%
+  pull(name)
+
+Long$name<-factor(Long$name,levels=Order)
+```
+
+# getting stats
+```{r}
+Setup<-Long%>%
+  dplyr::select(c(Subject,Draw,name,value))%>%
+  pivot_wider(names_from = Draw,values_from = value)
+
+FullDF<-data.frame()
+for(cell in unique(setdiff(unique(Setup$name),"Activated Mast Cells"))){
+  filt<-Setup%>%
+    filter(name==cell)
+  P<-t.test(filt$`1`, filt$`2`, paired = TRUE)
+  P<-P$p.value
+  Dif<-(filt$`2`-filt$`1`)
+  Dif<-mean(Dif[Dif!=Inf],na.rm=T)
+  DF<-data.frame(cell=cell,PVal=P,PerDif=Dif)
+  FullDF<-bind_rows(DF,FullDF)
+}
+
+FullDF$PerDif<-gsub("NaN","100",FullDF$PerDif)
+FullDF$PerDif<-as.numeric(FullDF$PerDif)
+
+ggplot(FullDF,aes(y=reorder(cell,PerDif),x=PerDif,shape=PVal<0.05))+geom_point()+theme(strip.text.y = element_text(angle=0))+theme_bw()+theme(strip.text.y = element_text(angle=0),strip.background = element_blank())+geom_vline(xintercept = 0)+scale_shape_manual(values=c(1,8))+xlab("Mean Difference (Draw 2 vs Draw 1)")+ylab("")
+
+ggplot(FullDF,aes(x=PerDif,y=-log10(PVal)))+geom_point()+theme_bw()+theme(strip.text.y = element_text(angle=0))
+```
+
+
+

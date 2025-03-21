@@ -2,7 +2,7 @@
 Code to generate visualizations for Clarava manuscript in 2025.
 
 ## DEGs_ABMRvTCMR.Rmd
-Performs DEGs and GSEA between ABMR and TCMR.
+Performs DEGs and GSEA between ABMR and TCMR only in deceased donors.
 Required SharePoint Files:
 - [Clarava_validation_122samples_annotations_pred_longterm_outcomes_ryan_reject.csv](https://verici.sharepoint.com/:x:/s/VericiAssaysDevelopment/EYzEfseaylREsJKdrt82u7kB1kllosokEyomimVgv1urZg?e=3yBO5D)
 -[Clarava_deceased_donor_training_5_Annotations_Allinclusive_ar_WithBinaryReject_ar_ryan_reject.csv](https://verici.sharepoint.com/:x:/s/VericiAssaysDevelopment/ERyzCcJcC0hNmWTTGF1huzYB0dkEzcMf9FJlBGBTF23WJQ?e=tGKbm1)
@@ -10,7 +10,7 @@ Required SharePoint Files:
 - [CT1_Stratified_Training_deceased_donor_TPM_11K.csv](https://verici.sharepoint.com/:x:/s/VericiAssaysDevelopment/EXsWrhdRRHJKpLyC_v4ApMQBR7gz6YAxpB2Z0nEcDnuLHQ?e=N5rCZa)
 
 ## iSort_Plots.Rmd
-Looks at iSort results between A) Rejects and No Rejects and B) ABMR and TCMR within Clarava Rejects.
+Looks at iSort results in deceased donors between A) Rejects and No Rejects and B) ABMR and TCMR within Clarava Rejects.
 
 Required SharePoint Files:
 - [Clarava_validation_122samples_annotations_pred_longterm_outcomes_ryan_reject.csv](https://verici.sharepoint.com/:x:/s/VericiAssaysDevelopment/EYzEfseaylREsJKdrt82u7kB1kllosokEyomimVgv1urZg?e=3yBO5D)

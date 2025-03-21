@@ -29,13 +29,7 @@ ABMR<-typs[grepl("ABMR",typs)]
 MildModerateTCMR<-c("borderline","IA")
 SevereTCMR<-setdiff(typs,c(ABMR,MildModerateTCMR,""))
 
-
-Data$Group<-"tbd"
-Data[Data$MM_Rejection_Type%in%ABMR,"Group"]<-"ABMR"
-Data[Data$MM_Rejection_Type%in%MildModerateTCMR,"Group"]<-"Mild-Moderate TCMR"
-Data[Data$MM_Rejection_Type%in%SevereTCMR,"Group"]<-"Severe TCMR"
-
-Data$Group2<-"tbd"
+Data$Group2<-"NoReject"
 Data[Data$MM_Rejection_Type%in%ABMR,"Group2"]<-"ABMR"
 Data[Data$MM_Rejection_Type%in%c(MildModerateTCMR,SevereTCMR),"Group2"]<-"TCMR"
 
@@ -110,7 +104,7 @@ ggplot(Long, aes(x = name, y = value, color = reject)) +
   theme(legend.position = "top") +
   coord_flip() +
   theme_bw() +
-  scale_color_manual(values = c("#141C52", "#F23F1C")) +
+  scale_color_manual(values = c("#141C52", "#F23F1C","#DA188D")) +
   theme(legend.title = element_blank()) +
   facet_grid(Broad ~ ., scales = "free_y", drop = TRUE, space = "free") +
   theme(strip.background = element_rect(fill = "white"),
@@ -120,28 +114,9 @@ ggplot(Long, aes(x = name, y = value, color = reject)) +
   theme(axis.title.y = element_blank())
 ```
 
-```{r}
-ggplot(Long%>%filter(Group!="tbd")%>%filter(reject=="Reject"), aes(x = name, y = value, color = Group)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_point(position = position_jitterdodge(dodge.width = 0.7, jitter.width = 0.1), 
-             size = 0.05, alpha = 0.5) +
-  ggpubr::stat_compare_means(method = "anova", label = "p.format", 
-                             hide.ns = FALSE, size = 3, hjust = 0.5, vjust = 0.5) +
-  theme(legend.position = "top") +
-  coord_flip() +
-  theme_bw() +
-  scale_color_manual(values = c("#141C52","#F23F1C",Palette[1])) +
-  theme(legend.title = element_blank()) +
-  facet_grid(Broad ~ ., scales = "free_y", drop = TRUE, space = "free") +
-  theme(strip.background = element_rect(fill = "white"),
-        strip.text.y.right = element_text(angle = 0),
-        panel.grid = element_blank()) +
-  labs(y = "Composition (Min/Max Normalized)") +
-  theme(axis.title.y = element_blank(),legend.position = "top")
-```
 
 ```{r}
-ggplot(Long%>%filter(Group!="tbd")%>%filter(reject=="Reject"), aes(x = name, y = value, color = Group2)) +
+ggplot(Long, aes(x = name, y = value, color = Group2)) +
   geom_boxplot(outlier.shape = NA) +
   geom_point(position = position_jitterdodge(dodge.width = 0.7, jitter.width = 0.1), 
              size = 0.05, alpha = 0.5) +
@@ -150,7 +125,7 @@ ggplot(Long%>%filter(Group!="tbd")%>%filter(reject=="Reject"), aes(x = name, y =
   theme(legend.position = "top") +
   coord_flip() +
   theme_bw() +
-  scale_color_manual(values = c("#141C52","#F23F1C")) +
+  scale_color_manual(values = c("#141C52","#F23F1C","gray")) +
   theme(legend.title = element_blank()) +
   facet_grid(Broad ~ ., scales = "free_y", drop = TRUE, space = "free") +
   theme(strip.background = element_rect(fill = "white"),
@@ -190,9 +165,9 @@ ggplot(Long,aes(x=name,y=value,color=reject))+geom_boxplot(outlier.shape = NA)+
 ```
 
 ```{r}
-ggplot(Long%>%filter(Group!="tbd"),aes(x=name,y=value,color=Group2))+geom_boxplot(outlier.shape = NA)+
+ggplot(Long,aes(x=name,y=value,color=Group2))+geom_boxplot(outlier.shape = NA)+
   geom_point(position=position_jitterdodge(dodge.width=0.7,jitter.width = 0.1),size=0.05,alpha=0.5)+
-  ggpubr::stat_compare_means(method="anova",label = "p.format",hide.ns = F,size=3,hjust=0.5,vjust=0.5) + theme(legend.position = "top")+coord_flip()+theme_bw()+scale_color_manual(values=c("#141C52","#F23F1C"))+theme(legend.title = element_blank())+theme(strip.background = element_rect(fill="white"),strip.text.y.right = element_text(angle=0),panel.grid = element_blank())+labs(y="Composition (Min/Max Normalized)")+theme(axis.title.y = element_blank(),legend.position = "top")
+  ggpubr::stat_compare_means(method="anova",label = "p.format",hide.ns = F,size=3,hjust=0.5,vjust=0.5) + theme(legend.position = "top")+coord_flip()+theme_bw()+scale_color_manual(values=c("#141C52","#F23F1C","gray"))+theme(legend.title = element_blank())+theme(strip.background = element_rect(fill="white"),strip.text.y.right = element_text(angle=0),panel.grid = element_blank())+labs(y="Composition (Min/Max Normalized)")+theme(axis.title.y = element_blank(),legend.position = "top")
 
 
 ```

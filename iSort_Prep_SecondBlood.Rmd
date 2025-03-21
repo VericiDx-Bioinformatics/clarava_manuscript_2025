@@ -1,0 +1,78 @@
+---
+title: "iSort Prep for 2nd Blood Draw Samples"
+output: html_document
+date: "2025-02-18"
+---
+
+# Set up
+```{r}
+rm(list=ls())
+library(tidyverse)
+```
+
+```{r}
+setwd("/Users/alinaklineschoder/Desktop/Clarava_Counts/")
+files<-list.files()
+Full<-data.frame()
+for(file in files){
+  tb<-read_tsv(file)%>%
+    dplyr::select(`Gene Name`,TPM)
+  colnames(tb)<-c("hgnc_symbol",gsub("\\.csv","",file))
+  if(nrow(Full)==0){
+    Full<-tb
+  }else{
+    Full<-left_join(Full,tb)
+  }
+}
+
+Full <- Full %>% dplyr::select(hgnc_symbol, everything())
+Full <- aggregate(. ~ hgnc_symbol, data=Full, FUN=sum)
+Full <- Full[which(Full$hgnc_symbol != ""),]
+Full <- Full[which(!is.na(Full$hgnc_symbol)),]
+
+write.table(Full, "/Users/alinaklineschoder/Desktop/LivingDonor_iSort_2ndDraw.txt", sep = "\t", row.names = F, quote = F)
+```
+
+```{r}
+setwd("/Users/alinaklineschoder/Desktop/Clarava_Counts/")
+files<-list.files()
+Full<-data.frame()
+for(file in files){
+  tb<-read_tsv(file)%>%
+    dplyr::select(`Gene ID`,TPM)
+  colnames(tb)<-c("Gene",gsub("\\.csv","",file))
+  if(nrow(Full)==0){
+    Full<-tb
+  }else{
+    Full<-left_join(Full,tb)
+  }
+}
+
+write.csv(Full, "/Users/alinaklineschoder/Desktop/LivingDonor_iSort_2ndDraw_TPM.csv")
+```
+
+
+
+#Load biomart
+```{r}
+library(biomaRt)
+
+ensembl = biomaRt::useMart("ensembl",dataset="hsapiens_gene_ensembl")
+```
+
+### swap gene id for gene symbol in counts val. for gene symbol dups, add expression ###
+```{r}
+dim(Full)
+ens <- Full$ensembl_id
+mart <- useDataset("hsapiens_gene_ensembl", mart = useMart("ensembl"))
+g_list <- getBM(attributes = c("ensembl_gene_id", "hgnc_symbol"), values = "ENSG00000253039", mart = mart, filters = "ensembl_gene_id")
+
+Full <- left_join(Full, g_list, by = c("ensembl_id" = "ensembl_gene_id"))
+Full$ensembl_id <- NULL
+
+dim(Full)
+```
+
+```{r}
+
+```
