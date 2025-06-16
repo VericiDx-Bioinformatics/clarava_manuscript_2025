@@ -15,46 +15,66 @@ library(tidyverse)
 
 # functions
 ```{r}
-volcano_plot<-function(filtered_result){
+NS<-"gray"
+Sig<-"#1AE2ED"
+Highlight<-"#732472"
+
+
+
+volcano_plot<-function(filtered_result,option="all_genes"){
+if(option=="all_genes"){
+  genes <- filtered_result[filtered_result$hgnc_symbol %in% gene_sig_29$Gene.Symbol, "hgnc_symbol"]
   keyvals <- ifelse(
-    filtered_result$hgnc_symbol %in% gene_sig_29$Gene.Symbol, 'orange3',
-    ifelse(filtered_result$pvalue <= 0.01, 'steelblue3', 
-           'grey')
+    filtered_result$hgnc_symbol %in% gene_sig_29$Gene.Symbol, Highlight,
+    ifelse(filtered_result$pvalue <= 0.01, Sig, NS)
   )
-  keyvals[is.na(keyvals)] <- 'grey'
-  
-  names(keyvals) <- rownames(filtered_result)
-  p1 <- EnhancedVolcano(filtered_result,
-                        lab = filtered_result$hgnc_symbol,
-                        x = 'log2FoldChange',
-                        y = 'pvalue',
-                        pCutoff = 1e-2,
-                        FCcutoff = 0,
-                        pointSize = 1.0,
-                        selectLab = setdiff(unique(filtered_result$hgnc_symbol),NA),
-                        labSize = 4.0,
-                        labCol = 'black',
-                        boxedLabels = FALSE,
-                        #col = c('black', 'grey','steelblue4', 'orange3'),
-                        colCustom = keyvals,
-                        title = "",
-                        subtitle = "",
-                        cutoffLineType= "blank", # remove cutoff lines to set manually for hline
-                        hline = 1e-2,
-                        # drawConnectors = TRUE,
-                        # widthConnectors = 1.0,
-                        # colConnectors = "black",
-                        lengthConnectors = unit(0.05, 'npc'),
-                        max.overlaps = Inf,
-                        hlineWidth = 0.5,
-                        arrowheads = FALSE,
-                        ylim = c(0, 5.5),
-                        xlim = c(-1.5, 1.5), 
-                        gridlines.major = FALSE,
-                        gridlines.minor = FALSE,
-                        legendPosition = "none",
-                        caption=NULL)
-  return(p1+theme(legend.title = element_blank()))
+  alpha_vals <- ifelse(
+    filtered_result$hgnc_symbol %in% gene_sig_29$Gene.Symbol, 0.5, 0.25
+  )
+} else {
+  genes <- filtered_result[filtered_result$hgnc_symbol %in% gene_sig_29$Gene.Symbol & filtered_result$pvalue <= 0.01, "hgnc_symbol"]
+  keyvals <- ifelse(
+    filtered_result$hgnc_symbol %in% gene_sig_29$Gene.Symbol & filtered_result$pvalue <= 0.01, Highlight,
+    ifelse(filtered_result$pvalue <= 0.01, Sig, NS)
+  )
+  alpha_vals <- ifelse(
+    filtered_result$hgnc_symbol %in% gene_sig_29$Gene.Symbol & filtered_result$pvalue <= 0.01, 0.5, 0.25
+  )
+}
+
+names(keyvals) <- rownames(filtered_result)
+names(alpha_vals) <- rownames(filtered_result)
+
+p1 <- EnhancedVolcano(filtered_result,
+                      lab = filtered_result$hgnc_symbol,
+                      x = 'log2FoldChange',
+                      y = 'pvalue',
+                      pCutoff = 1e-2,
+                      FCcutoff = 0,
+                      pointSize = 1.0,
+                      selectLab = genes,
+                      labSize = 4.0,
+                      labCol = 'black',
+                      boxedLabels = FALSE,
+                      colCustom = keyvals,
+                      colAlpha = alpha_vals,
+                      title = "",
+                      subtitle = "",
+                      cutoffLineType= "blank",
+                      hline = 1e-2,
+                      lengthConnectors = unit(0.05, 'npc'),
+                      max.overlaps = Inf,
+                      hlineWidth = 0.5,
+                      arrowheads = FALSE,
+                      ylim = c(0, 5.5),
+                      xlim = c(-1.5, 1.5), 
+                      gridlines.major = FALSE,
+                      gridlines.minor = FALSE,
+                      legendPosition = "none",
+                      caption = NULL)
+
+return(p1 + theme(legend.title = element_blank()))
+
 }
   
 
@@ -164,6 +184,10 @@ p2 <- volcano_plot(gene_results)
 
 ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_Limma.png",p2,dpi = 300,width = 8,height = 8)
 
+p2 <- volcano_plot(gene_results,option="significant")
+
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_Limma_Sig.png",p2,dpi = 300,width = 8,height = 8)
+
 ```
 
 # EdgeR
@@ -191,6 +215,10 @@ gene_results$log2FoldChange<-gene_results$logFC
 p3 <- volcano_plot(gene_results)
 
 ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_EdgeR.png",p3,dpi = 300,width = 8,height = 8)
+
+p3 <- volcano_plot(gene_results,option="significant")
+
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_EdgeR_Sig.png",p3,dpi = 300,width = 8,height = 8)
 ```
 
 
@@ -209,6 +237,10 @@ filtered_result[,"GeneID"] <- rownames(filtered_result)
 filtered_result$hgnc_symbol<-recode_genes(rownames(filtered_result))
 p1 <- volcano_plot(filtered_result)
 
+
 ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_DESeq.png",p1,dpi = 300,width = 8,height = 8)
 
+p1 <- volcano_plot(filtered_result,option="significant")
+
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_DESeq_Sig.png",p1,dpi = 300,width = 8,height = 8)
 ```
