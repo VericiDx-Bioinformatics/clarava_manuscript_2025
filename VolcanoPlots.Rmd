@@ -1,0 +1,214 @@
+---
+title: "VolcanoPlots"
+output: html_document
+date: "2025-06-16"
+---
+
+```{r setup, include=FALSE}
+rm(list=ls())
+library(yaml)
+library(DESeq2)
+library(EnhancedVolcano)
+library(edgeR)
+library(tidyverse)
+```
+
+# functions
+```{r}
+volcano_plot<-function(filtered_result){
+  keyvals <- ifelse(
+    filtered_result$hgnc_symbol %in% gene_sig_29$Gene.Symbol, 'orange3',
+    ifelse(filtered_result$pvalue <= 0.01, 'steelblue3', 
+           'grey')
+  )
+  keyvals[is.na(keyvals)] <- 'grey'
+  
+  names(keyvals) <- rownames(filtered_result)
+  p1 <- EnhancedVolcano(filtered_result,
+                        lab = filtered_result$hgnc_symbol,
+                        x = 'log2FoldChange',
+                        y = 'pvalue',
+                        pCutoff = 1e-2,
+                        FCcutoff = 0,
+                        pointSize = 1.0,
+                        selectLab = setdiff(unique(filtered_result$hgnc_symbol),NA),
+                        labSize = 4.0,
+                        labCol = 'black',
+                        boxedLabels = FALSE,
+                        #col = c('black', 'grey','steelblue4', 'orange3'),
+                        colCustom = keyvals,
+                        title = "",
+                        subtitle = "",
+                        cutoffLineType= "blank", # remove cutoff lines to set manually for hline
+                        hline = 1e-2,
+                        # drawConnectors = TRUE,
+                        # widthConnectors = 1.0,
+                        # colConnectors = "black",
+                        lengthConnectors = unit(0.05, 'npc'),
+                        max.overlaps = Inf,
+                        hlineWidth = 0.5,
+                        arrowheads = FALSE,
+                        ylim = c(0, 5.5),
+                        xlim = c(-1.5, 1.5), 
+                        gridlines.major = FALSE,
+                        gridlines.minor = FALSE,
+                        legendPosition = "none",
+                        caption=NULL)
+  return(p1+theme(legend.title = element_blank()))
+}
+  
+
+
+recode_genes<-function(list){
+ensembl_to_gene <- c(
+  "ENSG00000119711" = "ALDH6A1",
+  "ENSG00000159363" = "ATP13A2",
+  "ENSG00000100554" = "ATP6V1D",
+  "ENSG00000123838" = "C4BPA",
+  "ENSG00000179388" = "EGR3",
+  "ENSG00000135862" = "LAMC1",
+  "ENSG00000164077" = "MON1A",
+  "ENSG00000178802" = "MPI",
+  "ENSG00000196586" = "MYO6",
+  "ENSG00000099795" = "NDUFB7",
+  "ENSG00000165609" = "NUDT5",
+  "ENSG00000157911" = "PEX10",
+  "ENSG00000184990" = "SIVA1",
+  "ENSG00000198740" = "ZNF652",
+  "ENSG00000176083" = "ZNF683",
+  "ENSG00000125434" = "SLC25A35",
+  "ENSG00000105072" = "C19orf44",
+  "ENSG00000182795" = "C1orf116",
+  "ENSG00000213563" = "C8orf82",
+  "ENSG00000167775" = "CD320",
+  "ENSG00000102805" = "CLN5",
+  "ENSG00000178149" = "DALRD3",
+  "ENSG00000176845" = "METRNL",
+  "ENSG00000148459" = "PDSS1",
+  "ENSG00000108352" = "RAPGEFL1",
+  "ENSG00000185187" = "SIGIRR",
+  "ENSG00000130511" = "SSBP4",
+  "ENSG00000198673" = "TAFA2",
+  "ENSG00000166848" = "TERF2IP"
+)
+  
+  new <- ensembl_to_gene[list]
+  
+  return(new)
+}
+```
+
+
+# Loading Data
+```{r}
+# prepare config file and directories
+config_path <- "/Users/alinaklineschoder/Downloads/config.yml"
+
+config <- read_yaml(config_path)
+base_dir <- dirname(normalizePath(config_path))
+data_dir <- file.path(base_dir, config$data_dir)
+gene_lists_dir <- file.path(paste(data_dir, config$gene_lists_dir, sep = ""))
+counts_dir <- file.path(paste(data_dir, config$counts_dir, sep = ""))
+annotations_dir <- data_dir
+results_dir <- file.path(paste0(base_dir, "/",config$results_dir))
+annotation_data_path <- file.path(paste(base_dir, config$ct1_annotations_123samples, sep = "/"))
+raw_gene_data_post_rawfilter_path <- file.path(paste(base_dir, config$gene_data_raw_counts, sep = "/"))
+gene_sig_29_path <- file.path(paste(base_dir, config$gene_sig_29,sep="/"))
+
+annotation_data <- read.csv(annotation_data_path, row.names = 1)
+rownames(annotation_data) <- annotation_data$Sample_ID
+
+
+gene_data_raw <- read.csv(raw_gene_data_post_rawfilter_path, check.names = F, row.names = 1)
+gene_matrix <- as.matrix(gene_data_raw)
+mode(gene_matrix) <- "integer"
+
+gene_matrix <- gene_matrix[,annotation_data$Sample_ID] #We limit samples to the ones in the annotation file.There are total 123 samples and 11170 genes.
+
+gene_sig_29 <- read.csv(gene_sig_29_path)
+```
+
+
+
+# LIMMA
+```{r}
+#Make DGElist from rejection data groups values
+rejDataGroups <- annotation_data[,"MM_Rejection_Determination"]
+d <- DGEList(counts=gene_matrix,group=factor(rejDataGroups))
+d.full <- d
+d$samples$lib.size <- colSums(d$counts)
+#Calculate normalization and disperson factors
+d <- calcNormFactors(d)
+outcome <- d$samples$group
+mm <- model.matrix(~0 + outcome)
+
+y <- voom(d, mm, plot = T)
+fit <- lmFit(y, mm)
+head(coef(fit))
+
+#make contrasts
+contr <- makeContrasts(outcomeReject - outcomeNoReject, levels = colnames(coef(fit)))
+tmp <- contrasts.fit(fit, contr)
+tmp <- eBayes(tmp)
+top.table <- topTable(tmp, sort.by = "P", n = Inf)
+
+gene_results <- top.table
+gene_results$hgnc_symbol<-recode_genes(rownames(gene_results))
+
+gene_results$log2FoldChange<-gene_results$logFC
+gene_results$pvalue<-gene_results$P.Value
+gene_results<-gene_results%>%
+  select(hgnc_symbol,pvalue,log2FoldChange)
+rownames(gene_results)<-NULL
+p2 <- volcano_plot(gene_results)
+
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_Limma.png",p2,dpi = 300,width = 8,height = 8)
+
+```
+
+# EdgeR
+```{r}
+#GLM estimates of dispersion - 
+### User Intervention
+# You can change method to "auto", "bin.spline", "power", "spline", "bin.loess".
+# The default is "auto" which chooses "bin.spline" when > 200 tags and "power" otherwise.
+design.mat <- model.matrix(~ 0 + d$samples$group)
+colnames(design.mat) <- levels(d$samples$group)
+d2 <- estimateGLMCommonDisp(d,design.mat)
+d2 <- estimateGLMTrendedDisp(d2,design.mat, method="auto")
+d2 <- estimateGLMTagwiseDisp(d2,design.mat)
+# compare groups 1 and 2
+et12 <- exactTest(d2, pair=c(1,2)) 
+
+#Top genes in model - n is number of top genes
+gene_results <- topTags(et12, n=length(rownames(gene_data_raw)), adjust.method = "BH")
+gene_results <- gene_results[["table"]]
+gene_results$hgnc_symbol<-recode_genes(rownames(gene_results))
+
+gene_results$pvalue<-gene_results$PValue
+gene_results$log2FoldChange<-gene_results$logFC
+
+p3 <- volcano_plot(gene_results)
+
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_EdgeR.png",p3,dpi = 300,width = 8,height = 8)
+```
+
+
+# DESEQ
+```{r read data}
+annotation_data$MM_Rejection_Determination <- as.factor(annotation_data$MM_Rejection_Determination)
+ddsMat <- DESeqDataSetFromMatrix(countData=gene_matrix, colData=annotation_data, design= ~ MM_Rejection_Determination)
+dds <- DESeq(ddsMat)
+result <- results(dds, c("MM_Rejection_Determination", "Reject", "NoReject"))
+
+## Extract a dataframe of the DeSeq2 results for all samples
+result_object <- na.omit(result)
+filtered_result <- data.frame(result_object@listData)
+rownames(filtered_result) <- result_object@rownames
+filtered_result[,"GeneID"] <- rownames(filtered_result)
+filtered_result$hgnc_symbol<-recode_genes(rownames(filtered_result))
+p1 <- volcano_plot(filtered_result)
+
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_DESeq.png",p1,dpi = 300,width = 8,height = 8)
+
+```
