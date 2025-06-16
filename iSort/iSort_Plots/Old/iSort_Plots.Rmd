@@ -11,7 +11,10 @@ library(pROC)
 library(ggplot2)
 library(tidyr)
 library(tidyverse)
-Palette<-c("#6B4CD7","#DA188D","#F23F1C")
+Palette1<-c("#141C52","#F23F1C","#832E37","gray")
+names(Palette1)<-c("ABMR","TCMR","Mixed ABMR/TCMR","NoReject")
+Palette2<-c("#141C52","#F23F1C")
+names(Palette2)<-c("NoReject","Reject")
 ```
 
 ```{r}
@@ -25,14 +28,14 @@ Data2<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_deceased_donor_train
 Data<-bind_rows(Data,Data2)
 
 typs<-unique(Data$MM_Rejection_Type)
-ABMR<-typs[grepl("ABMR",typs)]
-MildModerateTCMR<-c("borderline","IA")
-SevereTCMR<-setdiff(typs,c(ABMR,MildModerateTCMR,""))
+Mixed<-setdiff(typs[grepl("ABMR",typs)],"ABMR")
+TCMR<-setdiff(typs[!grepl("ABMR",typs)],"")
 
 Data$Group2<-"NoReject"
-Data[Data$MM_Rejection_Type%in%ABMR,"Group2"]<-"ABMR"
-Data[Data$MM_Rejection_Type%in%c(MildModerateTCMR,SevereTCMR),"Group2"]<-"TCMR"
-
+Data[Data$MM_Rejection_Type%in%Mixed,"Group2"]<-"Mixed ABMR/TCMR"
+Data[Data$MM_Rejection_Type%in%TCMR,"Group2"]<-"TCMR"
+Data[Data$MM_Rejection_Type=="ABMR","Group2"]<-"ABMR"
+Data$Group2<-factor(Data$Group2,levels = c("ABMR","Mixed ABMR/TCMR","TCMR","NoReject"))
 isort_results_val <- read.table("/Users/alinaklineschoder/Downloads/iSort_job63-121324-160003_Relative_AdjustedB.txt",header = T)%>%
   mutate(Subject=Mixture)%>%
   dplyr::select(-c(Mixture,P.value,Correlation,RMSE))
@@ -95,7 +98,7 @@ Order <- Long %>%
   pull(name)
 
 Long$name<-factor(Long$name,levels=Order)
-ggplot(Long, aes(x = name, y = value, color = reject)) +
+ggp<-ggplot(Long, aes(x = name, y = value, color = reject)) +
   geom_boxplot(outlier.shape = NA) +
   geom_point(position = position_jitterdodge(dodge.width = 0.7, jitter.width = 0.1), 
              size = 0.05, alpha = 0.5) +
@@ -104,7 +107,7 @@ ggplot(Long, aes(x = name, y = value, color = reject)) +
   theme(legend.position = "top") +
   coord_flip() +
   theme_bw() +
-  scale_color_manual(values = c("#141C52", "#F23F1C","#DA188D")) +
+  scale_color_manual(values = Palette2) +
   theme(legend.title = element_blank()) +
   facet_grid(Broad ~ ., scales = "free_y", drop = TRUE, space = "free") +
   theme(strip.background = element_rect(fill = "white"),
@@ -112,11 +115,13 @@ ggplot(Long, aes(x = name, y = value, color = reject)) +
         panel.grid = element_blank()) +
   labs(y = "Composition (Min/Max Normalized)") +
   theme(axis.title.y = element_blank())
+
+ggsave(plot = ggp,filename="/Users/alinaklineschoder/Desktop/RvNR.png",width = 10,height = 8)
 ```
 
 
 ```{r}
-ggplot(Long, aes(x = name, y = value, color = Group2)) +
+ggp<-ggplot(Long, aes(x = name, y = value, color = Group2)) +
   geom_boxplot(outlier.shape = NA) +
   geom_point(position = position_jitterdodge(dodge.width = 0.7, jitter.width = 0.1), 
              size = 0.05, alpha = 0.5) +
@@ -125,7 +130,7 @@ ggplot(Long, aes(x = name, y = value, color = Group2)) +
   theme(legend.position = "top") +
   coord_flip() +
   theme_bw() +
-  scale_color_manual(values = c("#141C52","#F23F1C","gray")) +
+  scale_color_manual(values = Palette1) +
   theme(legend.title = element_blank()) +
   facet_grid(Broad ~ ., scales = "free_y", drop = TRUE, space = "free") +
   theme(strip.background = element_rect(fill = "white"),
@@ -133,6 +138,28 @@ ggplot(Long, aes(x = name, y = value, color = Group2)) +
         panel.grid = element_blank()) +
   labs(y = "Composition (Min/Max Normalized)") +
   theme(axis.title.y = element_blank(),legend.position = "top")
+
+ggsave(plot = ggp,filename="/Users/alinaklineschoder/Desktop/TCMRvABMRvNR.png",width = 10,height = 10)
+
+ggp<-ggplot(Long%>%filter(Group2%in%c("ABMR","TCMR","Mixed ABMR/TCMR")), aes(x = name, y = value, color = Group2)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(position = position_jitterdodge(dodge.width = 0.7, jitter.width = 0.1), 
+             size = 0.05, alpha = 0.5) +
+  ggpubr::stat_compare_means(method = "anova", label = "p.format", 
+                             hide.ns = FALSE, size = 3, hjust = 0.5, vjust = 0.5) +
+  theme(legend.position = "top") +
+  coord_flip() +
+  theme_bw() +
+  scale_color_manual(values = Palette1) +
+  theme(legend.title = element_blank()) +
+  facet_grid(Broad ~ ., scales = "free_y", drop = TRUE, space = "free") +
+  theme(strip.background = element_rect(fill = "white"),
+        strip.text.y.right = element_text(angle = 0),
+        panel.grid = element_blank()) +
+  labs(y = "Composition (Min/Max Normalized)") +
+  theme(axis.title.y = element_blank(),legend.position = "top")
+
+ggsave(plot = ggp,filename="/Users/alinaklineschoder/Desktop/TCMRvABMR.png",width = 10,height = 8)
 ```
 
 
@@ -159,23 +186,28 @@ Order <- Long %>%
 
 Long$name<-factor(Long$name,levels=Order)
 
-ggplot(Long,aes(x=name,y=value,color=reject))+geom_boxplot(outlier.shape = NA)+
+ggp<-ggplot(Long,aes(x=name,y=value,color=reject))+geom_boxplot(outlier.shape = NA)+
   geom_point(position=position_jitterdodge(dodge.width=0.7,jitter.width = 0.1),size=0.05,alpha=0.5)+
-  ggpubr::stat_compare_means(method="t.test",label = "p.format",hide.ns = F,size=3,hjust=0.5,vjust=0.5) + theme(legend.position = "top")+coord_flip()+theme_bw()+scale_color_manual(values=c("#141C52","#F23F1C",Palette[1]))+theme(legend.title = element_blank())+theme(strip.background = element_rect(fill="white"),strip.text.y.right = element_text(angle=0),panel.grid = element_blank())+labs(y="Composition (Min/Max Normalized)")+theme(axis.title.y = element_blank())
-```
+  ggpubr::stat_compare_means(method="t.test",label = "p.format",hide.ns = F,size=3,hjust=0.5,vjust=0.5) + theme(legend.position = "top")+coord_flip()+theme_bw()+scale_color_manual(values=Palette2)+theme(legend.title = element_blank())+theme(strip.background = element_rect(fill="white"),strip.text.y.right = element_text(angle=0),panel.grid = element_blank())+labs(y="Composition (Min/Max Normalized)")+theme(axis.title.y = element_blank())
 
-```{r}
-ggplot(Long,aes(x=name,y=value,color=Group2))+geom_boxplot(outlier.shape = NA)+
-  geom_point(position=position_jitterdodge(dodge.width=0.7,jitter.width = 0.1),size=0.05,alpha=0.5)+
-  ggpubr::stat_compare_means(method="anova",label = "p.format",hide.ns = F,size=3,hjust=0.5,vjust=0.5) + theme(legend.position = "top")+coord_flip()+theme_bw()+scale_color_manual(values=c("#141C52","#F23F1C","gray"))+theme(legend.title = element_blank())+theme(strip.background = element_rect(fill="white"),strip.text.y.right = element_text(angle=0),panel.grid = element_blank())+labs(y="Composition (Min/Max Normalized)")+theme(axis.title.y = element_blank(),legend.position = "top")
-
+ggsave(plot = ggp,filename="/Users/alinaklineschoder/Desktop/RvNR_Broad.png",width = 10,height = 6)
 
 ```
 
 ```{r}
-ggplot(Long%>%filter(Group!="tbd")%>%filter(reject=="Reject"),aes(x=name,y=value,color=Group))+geom_boxplot(outlier.shape = NA)+
+
+ggp<-ggplot(Long,aes(x=name,y=value,color=Group2))+geom_boxplot(outlier.shape = NA)+
   geom_point(position=position_jitterdodge(dodge.width=0.7,jitter.width = 0.1),size=0.05,alpha=0.5)+
-  ggpubr::stat_compare_means(method="anova",label = "p.format",hide.ns = F,size=3,hjust=0.5,vjust=0.5) + theme(legend.position = "top")+coord_flip()+theme_bw()+scale_color_manual(values = c("#141C52","#F23F1C",Palette[1]))+theme(legend.title = element_blank())+theme(strip.background = element_rect(fill="white"),strip.text.y.right = element_text(angle=0),panel.grid = element_blank())+labs(y="Composition (Min/Max Normalized)")+theme(axis.title.y = element_blank(),legend.position = "top")
+  ggpubr::stat_compare_means(method="anova",label = "p.format",hide.ns = F,size=3,hjust=0.5,vjust=0.5) + theme(legend.position = "top")+coord_flip()+theme_bw()+scale_color_manual(values=Palette1)+theme(legend.title = element_blank())+theme(strip.background = element_rect(fill="white"),strip.text.y.right = element_text(angle=0),panel.grid = element_blank())+labs(y="Composition (Min/Max Normalized)")+theme(axis.title.y = element_blank(),legend.position = "top")
+
+ggsave(plot = ggp,filename="/Users/alinaklineschoder/Desktop/ABMRvTCMRvNR_Broad.png",width = 10,height = 6)
+
+ggp<-ggplot(Long%>%filter(Group2%in%c("ABMR","TCMR","Mixed ABMR/TCMR")),aes(x=name,y=value,color=Group2))+geom_boxplot(outlier.shape = NA)+
+  geom_point(position=position_jitterdodge(dodge.width=0.7,jitter.width = 0.1),size=0.05,alpha=0.5)+
+  ggpubr::stat_compare_means(method="anova",label = "p.format",hide.ns = F,size=3,hjust=0.5,vjust=0.5) + theme(legend.position = "top")+coord_flip()+theme_bw()+scale_color_manual(values=Palette1)+theme(legend.title = element_blank())+theme(strip.background = element_rect(fill="white"),strip.text.y.right = element_text(angle=0),panel.grid = element_blank())+labs(y="Composition (Min/Max Normalized)")+theme(axis.title.y = element_blank(),legend.position = "top")
+
+ggsave(plot = ggp,filename="/Users/alinaklineschoder/Desktop/ABMRvTCMR_Broad.png",width = 10,height = 6)
 
 ```
+
 

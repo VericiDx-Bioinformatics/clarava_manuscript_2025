@@ -35,8 +35,8 @@ AlliSort<-AlliSort%>%
 Long <- Meta %>%
   left_join(AlliSort) %>%
   pivot_longer(cols=setdiff(colnames(.), c("Subject", "Draw","MM_Rejection_Type","Sample_ID"))) %>%
-  group_by(name) %>%
-  mutate(value = (value - min(value, na.rm = TRUE)) / (max(value, na.rm = TRUE) - min(value, na.rm = TRUE)))
+  group_by(name)# %>%
+  #mutate(value = (value - min(value, na.rm = TRUE)) / (max(value, na.rm = TRUE) - min(value, na.rm = TRUE)))
 ```
 
 

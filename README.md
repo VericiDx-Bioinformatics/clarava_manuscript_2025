@@ -57,4 +57,15 @@ Required SharePoint Files:
 ## SingleFiles.Rmd
 - Combines TPM, iSort and Metadata used in the clarava plots herein into single files to reduce confusion.
 
+Required Files:
+- [Clarava_validation_122samples_annotations_pred_longterm_outcomes_ryan_reject.csv](https://verici.sharepoint.com/:x:/s/VericiAssaysDevelopment/EYzEfseaylREsJKdrt82u7kB1kllosokEyomimVgv1urZg?e=3yBO5D)
+- [Clarava_deceased_donor_training_5_Annotations_Allinclusive_ar_WithBinaryReject_ar_ryan_reject.csv](https://verici.sharepoint.com/:x:/s/VericiAssaysDevelopment/ERyzCcJcC0hNmWTTGF1huzYB0dkEzcMf9FJlBGBTF23WJQ?e=tGKbm1)
+- [LD_Meta.csv](https://verici.sharepoint.com/:x:/s/VericiAssaysDevelopment/EYyt7QKB0pZHhJyLfPZLSfQB5LYeET8MlRsaPe8eHc3xsw?e=wDkbyE)
+- [Clarava_22Rejects_postTX_PAXg_BX.csv](https://verici.sharepoint.com/:x:/s/VericiAssaysDevelopment/ETC6DUZLiD1Kg6bBw8D7-fcBNIAPfKceyldjA7c50waYfw?e=RGFkRg)
+- [CT1_Expanded_validation_157_TPM.csv](https://verici.sharepoint.com/:x:/s/VericiAssaysDevelopment/EQx-fdDdPjVGia-nTlRocBUBB6yv7Du55emuB3B4NEkRwA?e=ukbFaB)
+- [CT1_Stratified_Validation_TPM.csv](https://verici.sharepoint.com/:x:/s/VericiAssaysDevelopment/Ea6_BbCQ7CNPrvmYRiYdfi8B8haq2jeDOS7aEJh08I5z6g?e=KAqPuV)
+- [CT1_Stratified_Training_TPM.csv](https://verici.sharepoint.com/:x:/s/VericiAssaysDevelopment/EeeIUto1cG9CoIQ2D4UkzgIBfrrTy0FgX0-DKAmchem0Aw?e=LfqPu5)
+- [CT1_Stratified_Validation_TPM_122samples.csv](https://verici.sharepoint.com/:x:/s/VericiAssaysDevelopment/Eb6udeV231dAkDLwYhwVKIoBSdpwB_QaC2ZGUZiEZ8-DXA?e=Nc9bN1)
+- [NextSeq2000-VPV3-MissedSamples-Clarava2_clarava_final_gene_matrix.tsv](https://verici.sharepoint.com/:u:/s/VericiAssaysDevelopment/EZNpwkMV391BgQboxjc0DhYBf6DWt4dXvmkMeXvBDIJBbA?e=a3IUwc)
+- [NextSeq2000__2023-04-05_VL00026-CT1-TNPT4_RQ_ClaravaOnly_clarava_final_gene_matrix.tsv](https://verici.sharepoint.com/:u:/s/VericiAssaysDevelopment/EZNpwkMV391BgQboxjc0DhYBf6DWt4dXvmkMeXvBDIJBbA?e=6ts0A1)
 

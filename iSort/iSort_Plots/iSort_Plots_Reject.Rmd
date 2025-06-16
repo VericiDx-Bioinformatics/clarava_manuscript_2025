@@ -1,5 +1,5 @@
 ---
-title: "DEGs"
+title: "PlotsForPoster"
 output: html_document
 date: "2025-02-18"
 ---
@@ -7,38 +7,45 @@ date: "2025-02-18"
 # Set up
 ```{r}
 rm(list=ls())
+library(pROC)
 library(ggplot2)
 library(tidyr)
 library(tidyverse)
-library(WGCNA)
-library(pheatmap)
-library(clusterProfiler)
-library(org.Hs.eg.db)  # Change if using mouse (org.Mm.eg.db)
+Palette2<-c("#141C52","#F23F1C")
+names(Palette2)<-c("NoReject","Reject")
 ```
 
-# Loading in LD results
 ```{r}
-LD<-read.table("/Users/alinaklineschoder/Downloads/jobresult76/iSort_job76-031925-200003_Relative_AdjustedB.txt",header = T)%>%
-  mutate(Subject=Mixture)%>%
-  dplyr::select(-c(Mixture,P.value,Correlation,RMSE))%>%
-  mutate(Donor_Type="Living Donor")
+Data<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_validation_122samples_annotations_pred_longterm_outcomes_ryan_reject.csv")%>%
+  mutate(Subject=Sequencing_Sample_ID,reject=ryan_reject)%>%
+  dplyr::select(reject,Subject,MM_Rejection_Type,Subject)
 
-DD <- read.table("/Users/alinaklineschoder/Downloads/iSort_job63-121324-160003_Relative_AdjustedB.txt",header = T)%>%
-  mutate(Subject=Mixture)%>%
-  dplyr::select(-c(Mixture,P.value,Correlation,RMSE))%>%
-  mutate(Donor_Type="Deceased Donor")
+Data2<-read.csv("/Users/alinaklineschoder/Downloads/Clarava_deceased_donor_training_5_Annotations_Allinclusive_ar_WithBinaryReject_ar_ryan_reject.csv")%>%
+  mutate(Subject=Sample_ID,reject=ryan_reject)%>%
+  dplyr::select(reject,Subject,MM_Rejection_Type)
+Data<-bind_rows(Data,Data2)
 
-All<-bind_rows(LD,DD)
-colnames(All)<-gsub("\\.","_",colnames(All))
+typs<-unique(Data$MM_Rejection_Type)
+Mixed<-setdiff(typs[grepl("ABMR",typs)],"ABMR")
+TCMR<-setdiff(typs[!grepl("ABMR",typs)],"")
+
+Data$Group2<-"NoReject"
+Data[Data$MM_Rejection_Type%in%Mixed,"Group2"]<-"Mixed ABMR/TCMR"
+Data[Data$MM_Rejection_Type%in%TCMR,"Group2"]<-"TCMR"
+Data[Data$MM_Rejection_Type=="ABMR","Group2"]<-"ABMR"
+Data$Group2<-factor(Data$Group2,levels = c("ABMR","Mixed ABMR/TCMR","TCMR","NoReject"))
+isort_results_val <- read.table("/Users/alinaklineschoder/Downloads/iSort_job63-121324-160003_Relative_AdjustedB.txt",header = T)%>%
+  mutate(Subject=Mixture)%>%
+  dplyr::select(-c(Mixture,P.value,Correlation,RMSE))
+colnames(isort_results_val) <- gsub("\\.","_",colnames(isort_results_val))
 ```
 
-# Broad
 ```{r}
-Long<-All%>%pivot_longer(cols=setdiff(colnames(.), c("Subject", "Donor_Type"))) %>%
+Long <- Data %>%
+  left_join(isort_results_val) %>%
+  pivot_longer(cols=setdiff(colnames(.), c("Subject", "reject","MM_Rejection_Type","Group","Group2"))) %>%
   group_by(name) %>%
   mutate(value = (value - min(value, na.rm = TRUE)) / (max(value, na.rm = TRUE) - min(value, na.rm = TRUE)))
-
-
 
 Long$Broad<-"Other"
 Long$Broad[Long$name%in%c("B_cells_naive","B_cells_memory")]<-"B Cells"
@@ -91,9 +98,9 @@ Order <- Long %>%
 Long$name<-factor(Long$name,levels=Order)
 ```
 
-## version 1
+# Version 1
 ```{r}
-ggplot(Long, aes(x = name, y = value, color = Donor_Type)) +
+ggp<-ggplot(Long, aes(x = name, y = value, color = reject)) +
   geom_boxplot(outlier.shape = NA) +
   geom_point(position = position_jitterdodge(dodge.width = 0.7, jitter.width = 0.1), 
              size = 0.05, alpha = 0.5) +
@@ -102,28 +109,26 @@ ggplot(Long, aes(x = name, y = value, color = Donor_Type)) +
   theme(legend.position = "top") +
   coord_flip() +
   theme_bw() +
-  scale_color_manual(values = c("#141C52", "#F23F1C")) +
+  scale_color_manual(values = Palette2) +
   theme(legend.title = element_blank()) +
   facet_grid(Broad ~ ., scales = "free_y", drop = TRUE, space = "free") +
   theme(strip.background = element_rect(fill = "white"),
         strip.text.y.right = element_text(angle = 0),
         panel.grid = element_blank()) +
   labs(y = "Composition (Min/Max Normalized)") +
-  theme(axis.title.y = element_blank(),legend.position = "top")
+  theme(axis.title.y = element_blank())
+
+ggsave(plot = ggp,filename="/Users/alinaklineschoder/Desktop/RvNR.png",width = 10,height = 8)
 ```
 
-## version 2
+# Version 2
 ```{r}
-library(dplyr)
-library(ggplot2)
-
-
 # Compute p-values per 'name' within each facet level of Broad
 pvals_df <- Long %>%
   group_by(Broad, name) %>%
   summarise(
     pval = tryCatch({
-      t.test(value ~ Donor_Type)$p.value
+      t.test(value ~ reject)$p.value
     }, error = function(e) NA_real_),
     .groups = "drop"
   ) %>%
@@ -131,7 +136,7 @@ pvals_df <- Long %>%
   mutate(y_pos=1.1)
 
 # Plot with manual p-values
-V2_Colors1<-ggplot(Long, aes(x = name, y = value, color = Donor_Type)) +
+V2_Colors1<-ggplot(Long, aes(x = name, y = value, color = reject)) +
   geom_boxplot(outlier.shape = NA,linewidth = 0.25) +
   geom_text(data = pvals_df%>%distinct(),
             aes(x = name, y = y_pos, label = pval_rounded),
@@ -140,7 +145,7 @@ V2_Colors1<-ggplot(Long, aes(x = name, y = value, color = Donor_Type)) +
   theme(legend.position = "top") +
   coord_flip() +
   theme_bw() +
-  scale_color_manual(values = c("#141C52", "#F23F1C")) +
+  scale_color_manual(values = c("#F23F1C","#141C52")) +
   theme(
     legend.title = element_blank(),
     strip.background = element_rect(fill = "white"),
@@ -155,10 +160,10 @@ V2_Colors1<-ggplot(Long, aes(x = name, y = value, color = Donor_Type)) +
   labs(y = "Composition (Min/Max Normalized)")+
   ylim(c(0,1.12))
 
-ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/LDDD_BoxPlot_V2_NavyOrange.png",V2_Colors1,dpi = 300,width = 8,height = 7)
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Reject_BoxPlot_V2_NavyOrange.png",V2_Colors1,dpi = 300,width = 10,height = 7)
 
 # Plot with manual p-values
-V2_Colors2<-ggplot(Long, aes(x = name, y = value, color = Donor_Type)) +
+V2_Colors2<-ggplot(Long, aes(x = name, y = value, color = reject)) +
   geom_boxplot(outlier.shape = NA,linewidth = 0.25) +
   geom_text(data = pvals_df%>%distinct(),
             aes(x = name, y = y_pos, label = pval_rounded),
@@ -182,14 +187,13 @@ V2_Colors2<-ggplot(Long, aes(x = name, y = value, color = Donor_Type)) +
   labs(y = "Composition (Min/Max Normalized)")+
   ylim(c(0,1.12))
 
-ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/LDDD_BoxPlot_BluePink.png",V2_Colors2,dpi = 300,width = 8,height = 7)
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Reject_BoxPlot_BluePink.png",V2_Colors2,dpi = 300,width = 8,height = 7)
 ```
 
-## version 3
 ```{r}
 # Compute min-max for each group for range bars
 summary_df <- Long %>%
-  group_by(Broad, name, Donor_Type) %>%
+  group_by(Broad, name, reject) %>%
   summarise(
     q25 = quantile(value, 0.25, na.rm = TRUE),
     q50 = quantile(value, 0.50, na.rm = TRUE),
@@ -202,23 +206,23 @@ pvals_df <- Long %>%
   group_by(Broad, name) %>%
   summarise(
     pval = tryCatch({
-      t.test(value ~ Donor_Type)$p.value
+      t.test(value ~ reject)$p.value
     }, error = function(e) NA_real_),
     .groups = "drop"
   ) %>%
-  mutate(pval_rounded = ifelse(!is.na(pval), sprintf("p = %.3f", round(pval, 3)), "p = NA")) %>%
-  mutate(y_pos = 1.1)
+  mutate(pval_rounded = ifelse(!is.na(pval), sprintf("p = %.3f", round(pval, 3)), "p = NA"))%>%
+  mutate(y_pos=1.1)
 
 
 # Plot with manual p-values
-V3<-ggplot(Long, aes(x = name, y = value, color = Donor_Type)) +
+V3<-ggplot(Long, aes(x = name, y = value, color = reject)) +
   geom_linerange(data = summary_df,
-                 aes(x = name, ymin = q25, ymax = q75, color = Donor_Type),
+                 aes(x = name, ymin = q25, ymax = q75, color = reject),
                  position = position_dodge(width = 0.7),
                  size = 0.5,
                  inherit.aes = FALSE) +
   geom_point(data = summary_df,
-             aes(x = name, y = q50, color = Donor_Type),
+             aes(x = name, y = q50, color = reject),
              position = position_dodge(width = 0.7),
              size = 2,
              inherit.aes = FALSE) +
@@ -244,17 +248,17 @@ V3<-ggplot(Long, aes(x = name, y = value, color = Donor_Type)) +
   labs(y = "Composition (Min/Max Normalized)")+
   ylim(c(0,1.12))
 
-ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/LDDD_LinePlot_BluePink.png",V3,dpi = 300,width = 8,height = 7)
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Reject_LinePlot_BluePink.png",V3,dpi = 300,width = 8,height = 7)
 
 # Plot with manual p-values
-V3B<-ggplot(Long, aes(x = name, y = value, color = Donor_Type)) +
+V3B<-ggplot(Long, aes(x = name, y = value, color = reject)) +
   geom_linerange(data = summary_df,
-                 aes(x = name, ymin = q25, ymax = q75, color = Donor_Type),
+                 aes(x = name, ymin = q25, ymax = q75, color = reject),
                  position = position_dodge(width = 0.7),
                  size = 0.5,
                  inherit.aes = FALSE) +
   geom_point(data = summary_df,
-             aes(x = name, y = q50, color = Donor_Type),
+             aes(x = name, y = q50, color = reject),
              position = position_dodge(width = 0.7),
              size = 2,
              inherit.aes = FALSE) +
@@ -265,7 +269,7 @@ V3B<-ggplot(Long, aes(x = name, y = value, color = Donor_Type)) +
   theme(legend.position = "top") +
   coord_flip() +
   theme_bw() +
-  scale_color_manual(values = c("#141C52", "#F23F1C")) +
+  scale_color_manual(values = c("#F23F1C","#141C52")) +
   theme(
     legend.title = element_blank(),
     strip.background = element_rect(fill = "white"),
@@ -277,11 +281,10 @@ V3B<-ggplot(Long, aes(x = name, y = value, color = Donor_Type)) +
     axis.title.x = element_text(size=14)
   ) +
   facet_grid(Broad ~ ., scales = "free_y", drop = TRUE, space = "free") +
-  labs(y = "Composition (Min/Max Normalized)")
+  labs(y = "Composition (Min/Max Normalized)")+
+  ylim(c(0,1.12))
 
-ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/LDDD_LinePlot_NavyOrange.png",V3B,dpi = 300,width = 8,height = 7)
-
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Reject_LinePlot_NavyOrange.png",V3B,dpi = 300,width = 8,height = 7)
 ```
-
 
 
