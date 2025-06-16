@@ -45,33 +45,36 @@ if(option=="all_genes"){
 names(keyvals) <- rownames(filtered_result)
 names(alpha_vals) <- rownames(filtered_result)
 
-p1 <- EnhancedVolcano(filtered_result,
-                      lab = filtered_result$hgnc_symbol,
-                      x = 'log2FoldChange',
-                      y = 'pvalue',
-                      pCutoff = 1e-2,
-                      FCcutoff = 0,
-                      pointSize = 1.0,
-                      selectLab = genes,
-                      labSize = 4.0,
-                      labCol = 'black',
-                      boxedLabels = FALSE,
-                      colCustom = keyvals,
-                      colAlpha = alpha_vals,
-                      title = "",
-                      subtitle = "",
-                      cutoffLineType= "blank",
-                      hline = 1e-2,
-                      lengthConnectors = unit(0.05, 'npc'),
-                      max.overlaps = Inf,
-                      hlineWidth = 0.5,
-                      arrowheads = FALSE,
-                      ylim = c(0, 5.5),
-                      xlim = c(-1.5, 1.5), 
-                      gridlines.major = FALSE,
-                      gridlines.minor = FALSE,
-                      legendPosition = "none",
-                      caption = NULL)
+p1 <- EnhancedVolcano(
+    filtered_result,
+    lab = filtered_result$hgnc_symbol,
+    x = 'log2FoldChange',
+    y = 'pvalue',
+    pCutoff = 1e-2,
+    FCcutoff = 0,
+    pointSize = 1.0,
+    selectLab = genes,
+    labSize = 3.5,          # Smaller than original 4.0
+    labCol = 'black',
+    labFace = "bold",       # This makes the labels bold
+    boxedLabels = FALSE,
+    colCustom = keyvals,
+    colAlpha = alpha_vals,
+    title = "",
+    subtitle = "",
+    cutoffLineType= "blank",
+    hline = 1e-2,
+    lengthConnectors = unit(0.05, 'npc'),
+    max.overlaps = Inf,
+    hlineWidth = 0.5,
+    arrowheads = FALSE,
+    ylim = c(0, 5.5),
+    xlim = c(-1.5, 1.5), 
+    gridlines.major = FALSE,
+    gridlines.minor = FALSE,
+    legendPosition = "none",
+    caption = NULL
+  )
 
 return(p1 + theme(legend.title = element_blank()))
 
