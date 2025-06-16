@@ -153,14 +153,14 @@ V2_Colors1<-ggplot(Long, aes(x = name, y = value, color = reject)) +
     panel.grid = element_blank(),
     axis.title.y = element_blank(),
     legend.position = "top",
-    axis.text=element_text(size=12),
+    axis.text=element_text(size=10,face = "bold"),
     axis.title.x = element_text(size=14)
   ) +
   facet_grid(Broad ~ ., scales = "free_y", drop = TRUE, space = "free") +
   labs(y = "Composition (Min/Max Normalized)")+
   ylim(c(0,1.12))
 
-ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Reject_BoxPlot_V2_NavyOrange.png",V2_Colors1,dpi = 300,width = 10,height = 7)
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Reject_BoxPlot_V2_NavyOrange_bold.png",V2_Colors1,dpi = 300,width = 10,height = 7)
 
 # Plot with manual p-values
 V2_Colors2<-ggplot(Long, aes(x = name, y = value, color = reject)) +
@@ -180,14 +180,14 @@ V2_Colors2<-ggplot(Long, aes(x = name, y = value, color = reject)) +
     panel.grid = element_blank(),
     axis.title.y = element_blank(),
     legend.position = "top",
-    axis.text=element_text(size=12),
+    axis.text=element_text(size=10,face = "bold"),
     axis.title.x = element_text(size=14)
   ) +
   facet_grid(Broad ~ ., scales = "free_y", drop = TRUE, space = "free") +
   labs(y = "Composition (Min/Max Normalized)")+
   ylim(c(0,1.12))
 
-ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Reject_BoxPlot_BluePink.png",V2_Colors2,dpi = 300,width = 8,height = 7)
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Reject_BoxPlot_BluePink_bold.png",V2_Colors2,dpi = 300,width = 8,height = 7)
 ```
 
 ```{r}
@@ -241,14 +241,14 @@ V3<-ggplot(Long, aes(x = name, y = value, color = reject)) +
     panel.grid = element_blank(),
     axis.title.y = element_blank(),
     legend.position = "top",
-    axis.text=element_text(size=12),
+    axis.text=element_text(size=10,face = "bold"),
     axis.title.x = element_text(size=14)
   ) +
   facet_grid(Broad ~ ., scales = "free_y", drop = TRUE, space = "free") +
   labs(y = "Composition (Min/Max Normalized)")+
   ylim(c(0,1.12))
 
-ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Reject_LinePlot_BluePink.png",V3,dpi = 300,width = 8,height = 7)
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Reject_LinePlot_BluePink_bold.png",V3,dpi = 300,width = 8,height = 7)
 
 # Plot with manual p-values
 V3B<-ggplot(Long, aes(x = name, y = value, color = reject)) +
@@ -277,14 +277,14 @@ V3B<-ggplot(Long, aes(x = name, y = value, color = reject)) +
     panel.grid = element_blank(),
     axis.title.y = element_blank(),
     legend.position = "top",
-    axis.text=element_text(size=12),
+    axis.text=element_text(size=10,face = "bold"),
     axis.title.x = element_text(size=14)
   ) +
   facet_grid(Broad ~ ., scales = "free_y", drop = TRUE, space = "free") +
   labs(y = "Composition (Min/Max Normalized)")+
   ylim(c(0,1.12))
 
-ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Reject_LinePlot_NavyOrange.png",V3B,dpi = 300,width = 8,height = 7)
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Reject_LinePlot_NavyOrange_bold.png",V3B,dpi = 300,width = 8,height = 7)
 ```
 
 

@@ -21,7 +21,7 @@ Highlight<-"#732472"
 
 
 
-volcano_plot<-function(filtered_result,option="all_genes"){
+volcano_plot<-function(filtered_result,option="all_genes",face="bold"){
 if(option=="all_genes"){
   genes <- filtered_result[filtered_result$hgnc_symbol %in% gene_sig_29$Gene.Symbol, "hgnc_symbol"]
   keyvals <- ifelse(
@@ -56,7 +56,7 @@ p1 <- EnhancedVolcano(
     selectLab = genes,
     labSize = 3.5,          # Smaller than original 4.0
     labCol = 'black',
-    labFace = "bold",       # This makes the labels bold
+    labFace = face,       # This makes the labels bold
     boxedLabels = FALSE,
     colCustom = keyvals,
     colAlpha = alpha_vals,
@@ -183,9 +183,6 @@ gene_results$pvalue<-gene_results$P.Value
 gene_results<-gene_results%>%
   select(hgnc_symbol,pvalue,log2FoldChange)
 rownames(gene_results)<-NULL
-p2 <- volcano_plot(gene_results)
-
-ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_Limma.png",p2,dpi = 300,width = 8,height = 8)
 
 p2 <- volcano_plot(gene_results,option="significant")
 
