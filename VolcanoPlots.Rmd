@@ -15,13 +15,20 @@ library(tidyverse)
 
 # functions
 ```{r}
-NS<-"gray"
-Sig<-"#1AE2ED"
-Highlight<-"#732472"
+volcano_plot<-function(filtered_result,
+                       option="all_genes",
+                       face="bold",
+                       colors=c("gray","#1AE2ED","#732472"),
+                       alpha=c(0.5,1),
+                       font_size=3.5){
+NS = colors[1]
+Sig = colors[2]
+Highlight=colors[3]
 
+Alpha1=alpha[1]
+Alpha2=alpha[2]
 
-
-volcano_plot<-function(filtered_result,option="all_genes",face="bold"){
+  
 if(option=="all_genes"){
   genes <- filtered_result[filtered_result$hgnc_symbol %in% gene_sig_29$Gene.Symbol, "hgnc_symbol"]
   keyvals <- ifelse(
@@ -29,7 +36,7 @@ if(option=="all_genes"){
     ifelse(filtered_result$pvalue <= 0.01, Sig, NS)
   )
   alpha_vals <- ifelse(
-    filtered_result$hgnc_symbol %in% gene_sig_29$Gene.Symbol, 0.5, 0.25
+    filtered_result$hgnc_symbol %in% gene_sig_29$Gene.Symbol, Alpha1, Alpha2
   )
 } else {
   genes <- filtered_result[filtered_result$hgnc_symbol %in% gene_sig_29$Gene.Symbol & filtered_result$pvalue <= 0.01, "hgnc_symbol"]
@@ -38,7 +45,7 @@ if(option=="all_genes"){
     ifelse(filtered_result$pvalue <= 0.01, Sig, NS)
   )
   alpha_vals <- ifelse(
-    filtered_result$hgnc_symbol %in% gene_sig_29$Gene.Symbol & filtered_result$pvalue <= 0.01, 0.5, 0.25
+    filtered_result$hgnc_symbol %in% gene_sig_29$Gene.Symbol & filtered_result$pvalue <= 0.01, Alpha1, Alpha2
   )
 }
 
@@ -54,7 +61,7 @@ p1 <- EnhancedVolcano(
     FCcutoff = 0,
     pointSize = 1.0,
     selectLab = genes,
-    labSize = 3.5,          # Smaller than original 4.0
+    labSize = font_size,          # Smaller than original 4.0
     labCol = 'black',
     labFace = face,       # This makes the labels bold
     boxedLabels = FALSE,
@@ -152,7 +159,6 @@ gene_sig_29 <- read.csv(gene_sig_29_path)
 ```
 
 
-
 # LIMMA
 ```{r}
 #Make DGElist from rejection data groups values
@@ -184,9 +190,29 @@ gene_results<-gene_results%>%
   select(hgnc_symbol,pvalue,log2FoldChange)
 rownames(gene_results)<-NULL
 
-p2 <- volcano_plot(gene_results,option="significant")
+p2 <- volcano_plot(gene_results,option="significant",face = "plain",font_size=4,colors=c("gray","#1AE2ED","#732472"),alpha=c(0.5,1))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_Limma_BluePurple.png",p2,dpi = 300,width = 8,height = 8)
 
-ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_Limma_Sig.png",p2,dpi = 300,width = 8,height = 8)
+p2 <- volcano_plot(gene_results,option="significant",face = "bold",font_size=3.5,colors=c("gray","#1AE2ED","#732472"),alpha=c(0.5,1))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_Limma_BluePurple_bold.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(gene_results,option="significant",face = "bold",font_size=3.5,colors=c("gray","#732472","#1AE2ED"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_Limma_PurpleBlue_bold.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(gene_results,option="significant",face = "plain",font_size=4,colors=c("gray","#732472","#1AE2ED"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_Limma_PurpleBlue_bold.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(gene_results,option="significant",face = "bold",font_size=3.5,colors=c("gray","#0092E1","#DA188D"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_Limma_BluePink_bold.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(gene_results,option="significant",face = "plain",font_size=4,colors=c("gray","#0092E1","#DA188D"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_Limma_BluePink.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(gene_results,option="significant",face = "plain",font_size=4,colors=c("gray","#141C52","#DA188D"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_Limma_NavyPink.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(gene_results,option="significant",face = "bold",font_size=3.5,colors=c("gray","#141C52","#DA188D"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_Limma_NavyPink_bold.png",p2,dpi = 300,width = 8,height = 8)
 
 ```
 
@@ -212,13 +238,30 @@ gene_results$hgnc_symbol<-recode_genes(rownames(gene_results))
 gene_results$pvalue<-gene_results$PValue
 gene_results$log2FoldChange<-gene_results$logFC
 
-p3 <- volcano_plot(gene_results)
 
-ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_EdgeR.png",p3,dpi = 300,width = 8,height = 8)
+p2 <- volcano_plot(gene_results,option="significant",face = "plain",font_size=4,colors=c("gray","#1AE2ED","#732472"),alpha=c(0.5,1))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_EdgeR_BluePurple.png",p2,dpi = 300,width = 8,height = 8)
 
-p3 <- volcano_plot(gene_results,option="significant")
+p2 <- volcano_plot(gene_results,option="significant",face = "bold",font_size=3.5,colors=c("gray","#1AE2ED","#732472"),alpha=c(0.5,1))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_EdgeR_BluePurple_bold.png",p2,dpi = 300,width = 8,height = 8)
 
-ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_EdgeR_Sig.png",p3,dpi = 300,width = 8,height = 8)
+p2 <- volcano_plot(gene_results,option="significant",face = "bold",font_size=3.5,colors=c("gray","#732472","#1AE2ED"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_EdgeR_PurpleBlue_bold.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(gene_results,option="significant",face = "plain",font_size=4,colors=c("gray","#732472","#1AE2ED"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_EdgeR_PurpleBlue_bold.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(gene_results,option="significant",face = "bold",font_size=3.5,colors=c("gray","#0092E1","#DA188D"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_EdgeR_BluePink_bold.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(gene_results,option="significant",face = "plain",font_size=4,colors=c("gray","#0092E1","#DA188D"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_EdgeR_BluePink.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(gene_results,option="significant",face = "plain",font_size=4,colors=c("gray","#141C52","#DA188D"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_EdgeR_NavyPink.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(gene_results,option="significant",face = "bold",font_size=3.5,colors=c("gray","#141C52","#DA188D"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_EdgeR_NavyPink_bold.png",p2,dpi = 300,width = 8,height = 8)
 ```
 
 
@@ -235,12 +278,30 @@ filtered_result <- data.frame(result_object@listData)
 rownames(filtered_result) <- result_object@rownames
 filtered_result[,"GeneID"] <- rownames(filtered_result)
 filtered_result$hgnc_symbol<-recode_genes(rownames(filtered_result))
-p1 <- volcano_plot(filtered_result)
 
 
-ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_DESeq.png",p1,dpi = 300,width = 8,height = 8)
+p2 <- volcano_plot(filtered_result,option="significant",face = "plain",font_size=4,colors=c("gray","#1AE2ED","#732472"),alpha=c(0.5,1))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_DESeq_BluePurple.png",p2,dpi = 300,width = 8,height = 8)
 
-p1 <- volcano_plot(filtered_result,option="significant")
+p2 <- volcano_plot(filtered_result,option="significant",face = "bold",font_size=3.5,colors=c("gray","#1AE2ED","#732472"),alpha=c(0.5,1))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_DESeq_BluePurple_bold.png",p2,dpi = 300,width = 8,height = 8)
 
-ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_DESeq_Sig.png",p1,dpi = 300,width = 8,height = 8)
+p2 <- volcano_plot(filtered_result,option="significant",face = "bold",font_size=3.5,colors=c("gray","#732472","#1AE2ED"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_DESeq_PurpleBlue_bold.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(filtered_result,option="significant",face = "plain",font_size=4,colors=c("gray","#732472","#1AE2ED"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_DESeq_PurpleBlue_bold.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(filtered_result,option="significant",face = "bold",font_size=3.5,colors=c("gray","#0092E1","#DA188D"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_DESeq_BluePink_bold.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(filtered_result,option="significant",face = "plain",font_size=4,colors=c("gray","#0092E1","#DA188D"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_DESeq_BluePink.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(filtered_result,option="significant",face = "plain",font_size=4,colors=c("gray","#141C52","#DA188D"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_DESeq_NavyPink.png",p2,dpi = 300,width = 8,height = 8)
+
+p2 <- volcano_plot(filtered_result,option="significant",face = "bold",font_size=3.5,colors=c("gray","#141C52","#DA188D"),alpha=c(1,0.5))
+ggsave("/Users/alinaklineschoder/Desktop/Data/iSort/Volcano_DESeq_NavyPink_bold.png",p2,dpi = 300,width = 8,height = 8)
+
 ```
